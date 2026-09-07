@@ -27,18 +27,18 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismis
       maxWidth: '380px'
     }}>
       {toasts.map(t => {
-        let bg = 'var(--bg-surface)';
-        let border = 'var(--border-subtle)';
+        let bg = 'var(--bg-surface-secondary)';
+        let border = 'var(--border-prominent)';
         let icon = <Info size={18} color="var(--color-action)" />;
 
         if (t.type === 'success') {
-          bg = '#f0fdf4';
-          border = '#86efac';
-          icon = <CheckCircle2 size={18} color="#15803d" />;
+          bg = 'var(--color-success-bg)';
+          border = 'var(--color-success-border)';
+          icon = <CheckCircle2 size={18} color="var(--color-success)" />;
         } else if (t.type === 'error') {
-          bg = '#fef2f2';
-          border = '#fca5a5';
-          icon = <AlertCircle size={18} color="#b91c1c" />;
+          bg = 'var(--color-danger-bg)';
+          border = 'var(--color-danger-border)';
+          icon = <AlertCircle size={18} color="var(--color-danger)" />;
         }
 
         return (

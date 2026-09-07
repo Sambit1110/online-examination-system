@@ -247,7 +247,7 @@ export const AdminResultsPage: React.FC = () => {
           <StatTile label="Total Candidates" value={stats.totalCandidates} />
           <StatTile label="Average Score" value={`${stats.averagePercentage}%`} valueColor="var(--color-action)" />
           <StatTile label="Qualified Candidates" value={stats.passedCandidates} valueColor="var(--color-success)" />
-          <StatTile label="Highest Score" value={`${stats.highestPercentage}%`} valueColor="#4338ca" />
+          <StatTile label="Highest Score" value={`${stats.highestPercentage}%`} valueColor="var(--color-brand-secondary)" />
         </div>
       )}
 

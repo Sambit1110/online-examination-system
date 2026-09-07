@@ -424,7 +424,7 @@ export const QuestionBankPage: React.FC = () => {
                         fontSize: '0.75rem',
                         fontWeight: 600,
                         textTransform: 'capitalize',
-                        color: q.difficulty === 'easy' ? '#15803d' : (q.difficulty === 'medium' ? '#b45309' : '#b91c1c')
+                        color: q.difficulty === 'easy' ? 'var(--color-success)' : (q.difficulty === 'medium' ? 'var(--color-warning)' : 'var(--color-danger)')
                       }}>
                         {q.difficulty}
                       </span>
@@ -582,7 +582,7 @@ export const QuestionBankPage: React.FC = () => {
                       cursor: 'pointer',
                       fontSize: '0.75rem',
                       fontWeight: 700,
-                      color: opt.is_correct === 1 ? '#047857' : 'var(--text-muted)'
+                      color: opt.is_correct === 1 ? 'var(--color-success)' : 'var(--text-muted)'
                     }}
                   >
                     <input
@@ -590,7 +590,7 @@ export const QuestionBankPage: React.FC = () => {
                       name="correct_answer_choice"
                       checked={opt.is_correct === 1}
                       onChange={() => handleSetCorrectOption(idx)}
-                      style={{ accentColor: '#059669', width: '1.1rem', height: '1.1rem' }}
+                      style={{ accentColor: 'var(--color-success)', width: '1.1rem', height: '1.1rem' }}
                     />
                     <span>{String.fromCharCode(65 + idx)}</span>
                   </label>
@@ -602,8 +602,8 @@ export const QuestionBankPage: React.FC = () => {
                     value={opt.option_text}
                     onChange={e => handleOptionTextChange(idx, e.target.value)}
                     style={{
-                      borderColor: opt.is_correct === 1 ? '#86efac' : 'var(--border-subtle)',
-                      backgroundColor: opt.is_correct === 1 ? '#f0fdf4' : '#ffffff'
+                      borderColor: opt.is_correct === 1 ? 'var(--color-success-border)' : 'var(--border-subtle)',
+                      backgroundColor: opt.is_correct === 1 ? 'var(--color-success-bg)' : 'var(--bg-surface-secondary)'
                     }}
                   />
 
@@ -655,8 +655,8 @@ export const QuestionBankPage: React.FC = () => {
                   style={{
                     padding: '0.75rem 1rem',
                     borderRadius: 'var(--radius-sm)',
-                    border: opt.is_correct ? '1px solid #a7f3d0' : '1px solid var(--border-subtle)',
-                    backgroundColor: opt.is_correct ? '#f0fdf4' : '#ffffff',
+                    border: opt.is_correct ? '1px solid var(--color-success-border)' : '1px solid var(--border-subtle)',
+                    backgroundColor: opt.is_correct ? 'var(--color-success-bg)' : 'var(--bg-surface-secondary)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -667,7 +667,7 @@ export const QuestionBankPage: React.FC = () => {
                     <strong>{String.fromCharCode(65 + idx)}.</strong> {opt.option_text}
                   </div>
                   {opt.is_correct ? (
-                    <span style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 700 }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 700 }}>
                       ✓ Correct Answer
                     </span>
                   ) : null}

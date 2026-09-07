@@ -1,4 +1,5 @@
 import React from 'react';
+import { TiltCard } from './TiltCard';
 
 interface StatTileProps {
   label: string;
@@ -11,7 +12,7 @@ interface StatTileProps {
 
 export const StatTile: React.FC<StatTileProps> = ({ label, value, meta, icon, valueColor, className }) => {
   return (
-    <div className={`card card-hover stat-tile ${className || ''}`}>
+    <TiltCard maxTilt={6} className={`card stat-tile ${className || ''}`}>
       <div>
         <div className="stat-tile__label">{label}</div>
         <div className="stat-tile__value" style={valueColor ? { color: valueColor } : undefined}>
@@ -20,6 +21,6 @@ export const StatTile: React.FC<StatTileProps> = ({ label, value, meta, icon, va
         {meta && <div className="stat-tile__meta">{meta}</div>}
       </div>
       {icon && <div className="stat-tile__icon">{icon}</div>}
-    </div>
+    </TiltCard>
   );
 };

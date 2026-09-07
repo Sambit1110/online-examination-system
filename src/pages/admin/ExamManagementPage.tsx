@@ -582,8 +582,8 @@ export const ExamManagementPage: React.FC = () => {
                       gap: '0.5rem',
                       padding: '0.4rem 0.6rem',
                       borderRadius: 'var(--radius-sm)',
-                      backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
-                      border: isSelected ? '1px solid #bfdbfe' : '1px solid var(--border-subtle)',
+                      backgroundColor: isSelected ? 'var(--color-accent-indigo-bg)' : 'var(--bg-surface-secondary)',
+                      border: isSelected ? '1px solid var(--color-accent-indigo-border)' : '1px solid var(--border-subtle)',
                       cursor: 'pointer',
                       fontSize: '0.8125rem'
                     }}

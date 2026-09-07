@@ -12,63 +12,63 @@ export const Badge: React.FC<BadgeProps> = ({ type, children }) => {
   switch (type) {
     case 'live':
       style = {
-        backgroundColor: '#f0fdf4',
-        color: '#15803d',
-        border: '1px solid #bbf7d0'
+        backgroundColor: 'var(--color-success-bg)',
+        color: 'var(--color-success)',
+        border: '1px solid var(--color-success-border)'
       };
-      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#16a34a', color: '#16a34a', display: 'inline-block', animation: 'badgeDotRing 1.8s ease-in-out infinite' }} />;
+      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--color-success)', color: 'var(--color-success)', display: 'inline-block', animation: 'badgeDotRing 1.8s ease-in-out infinite' }} />;
       break;
     case 'scheduled':
       style = {
-        backgroundColor: '#fffbeb',
-        color: '#b45309',
-        border: '1px solid #fde68a'
+        backgroundColor: 'var(--color-warning-bg)',
+        color: 'var(--color-warning)',
+        border: '1px solid var(--color-warning-border)'
       };
       break;
     case 'completed':
       style = {
-        backgroundColor: '#f1f5f9',
-        color: '#475569',
-        border: '1px solid #e2e8f0'
+        backgroundColor: 'var(--bg-surface-muted)',
+        color: 'var(--text-secondary)',
+        border: '1px solid var(--border-subtle)'
       };
       break;
     case 'released':
       style = {
-        backgroundColor: '#eef2ff',
-        color: '#4338ca',
-        border: '1px solid #c7d2fe'
+        backgroundColor: 'var(--color-accent-indigo-bg)',
+        color: 'var(--color-brand-secondary)',
+        border: '1px solid var(--color-accent-indigo-border)'
       };
       break;
     case 'draft':
       style = {
-        backgroundColor: '#f8fafc',
-        color: '#64748b',
-        border: '1px solid #e2e8f0'
+        backgroundColor: 'var(--bg-surface-secondary)',
+        color: 'var(--text-muted)',
+        border: '1px solid var(--border-subtle)'
       };
       break;
     case 'pass':
       style = {
-        backgroundColor: '#f0fdf4',
-        color: '#15803d',
-        border: '1px solid #bbf7d0',
+        backgroundColor: 'var(--color-success-bg)',
+        color: 'var(--color-success)',
+        border: '1px solid var(--color-success-border)',
         fontWeight: 600
       };
       break;
     case 'fail':
       style = {
-        backgroundColor: '#fef2f2',
-        color: '#b91c1c',
-        border: '1px solid #fecaca',
+        backgroundColor: 'var(--color-danger-bg)',
+        color: 'var(--color-danger)',
+        border: '1px solid var(--color-danger-border)',
         fontWeight: 600
       };
       break;
     case 'in_progress':
       style = {
-        backgroundColor: '#eff6ff',
-        color: '#1d4ed8',
-        border: '1px solid #bfdbfe'
+        backgroundColor: 'var(--color-accent-cyan-bg)',
+        color: 'var(--color-accent-cyan)',
+        border: '1px solid var(--color-accent-cyan-border)'
       };
-      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#2563eb', color: '#2563eb', display: 'inline-block', animation: 'badgeDotRing 1.8s ease-in-out infinite' }} />;
+      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--color-accent-cyan)', color: 'var(--color-accent-cyan)', display: 'inline-block', animation: 'badgeDotRing 1.8s ease-in-out infinite' }} />;
       break;
   }
 

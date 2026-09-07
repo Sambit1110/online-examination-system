@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { GraduationCap, AlertCircle, ArrowRight, Mail, Lock, ShieldCheck } from 'lucide-react';
+import { GraduationCap, AlertCircle, ArrowRight, Mail, Lock, ShieldCheck, Sparkles } from 'lucide-react';
 import { Footer } from '../../components/common/Footer';
+import { TiltCard } from '../../components/common/TiltCard';
+import { HeroBackground } from '../../components/three/HeroBackground';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -31,14 +33,19 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'transparent' }}>
-      {/* Centered Minimal Authentication Card */}
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'transparent', position: 'relative', overflow: 'hidden' }}>
+      {/* Ambient 3D scene — floating geometric shapes, decorative only */}
+      <HeroBackground />
+
+      {/* Centered Authentication Experience */}
       <main style={{
         flex: 1,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '2.5rem 1.5rem'
+        padding: '2.5rem 1.5rem',
+        position: 'relative',
+        zIndex: 1
       }}>
         <div className="animate-slide-up" style={{
           width: '100%',
@@ -46,11 +53,30 @@ export const LoginPage: React.FC = () => {
         }}>
           {/* Institution Header */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.3rem 0.75rem',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: 'var(--color-accent-indigo-bg)',
+              border: '1px solid var(--color-accent-indigo-border)',
+              color: 'var(--color-brand-secondary)',
+              fontSize: '0.6875rem',
+              fontWeight: 600,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              marginBottom: '1.25rem'
+            }}>
+              <Sparkles size={11} />
+              Examination Portal
+            </div>
+
             <div className="auth-icon-badge" style={{
-              width: '3rem',
-              height: '3rem',
+              width: '3.25rem',
+              height: '3.25rem',
               borderRadius: 'var(--radius-lg)',
-              backgroundColor: 'var(--color-action)',
+              background: 'linear-gradient(160deg, var(--color-action-hover), var(--color-action))',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -58,22 +84,22 @@ export const LoginPage: React.FC = () => {
               marginBottom: '1.1rem',
               boxShadow: 'var(--shadow-glow-brand)'
             }}>
-              <GraduationCap size={22} />
+              <GraduationCap size={24} />
             </div>
-            <h1 style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+            <h1 className="serif-title" style={{ fontSize: '1.6rem', fontWeight: 600, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
               Adamas University
             </h1>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
               Department of Computer Science & Engineering • Examination Portal
             </p>
           </div>
 
-          {/* Form Card */}
-          <div className="card animate-slide-up stagger-1" style={{ padding: '2rem', boxShadow: 'var(--shadow-lg)', borderRadius: 'var(--radius-lg)' }}>
+          {/* Form Card — glass surface with pointer-driven 3D tilt */}
+          <TiltCard maxTilt={5} className="glass-panel animate-slide-up stagger-1" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
             {/* Minimal Segmented Switcher */}
             <div style={{
               display: 'flex',
-              backgroundColor: 'var(--bg-surface-secondary)',
+              backgroundColor: 'rgba(255, 255, 255, 0.04)',
               borderRadius: 'var(--radius-sm)',
               padding: '2px',
               marginBottom: '1.5rem',
@@ -90,7 +116,7 @@ export const LoginPage: React.FC = () => {
                   fontWeight: 500,
                   fontSize: '0.8125rem',
                   cursor: 'pointer',
-                  backgroundColor: roleTab === 'student' ? 'var(--bg-surface)' : 'transparent',
+                  backgroundColor: roleTab === 'student' ? 'var(--bg-surface-muted)' : 'transparent',
                   color: roleTab === 'student' ? 'var(--text-main)' : 'var(--text-secondary)',
                   boxShadow: roleTab === 'student' ? 'var(--shadow-xs)' : 'none',
                   transition: 'background-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) ease, transform var(--duration-fast) ease'
@@ -109,7 +135,7 @@ export const LoginPage: React.FC = () => {
                   fontWeight: 500,
                   fontSize: '0.8125rem',
                   cursor: 'pointer',
-                  backgroundColor: roleTab === 'admin' ? 'var(--bg-surface)' : 'transparent',
+                  backgroundColor: roleTab === 'admin' ? 'var(--bg-surface-muted)' : 'transparent',
                   color: roleTab === 'admin' ? 'var(--text-main)' : 'var(--text-secondary)',
                   boxShadow: roleTab === 'admin' ? 'var(--shadow-xs)' : 'none',
                   transition: 'background-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) ease, transform var(--duration-fast) ease'
@@ -187,7 +213,7 @@ export const LoginPage: React.FC = () => {
                 )}
               </button>
             </form>
-          </div>
+          </TiltCard>
 
           <div className="animate-slide-up stagger-2" style={{
             display: 'flex',
@@ -205,7 +231,9 @@ export const LoginPage: React.FC = () => {
       </main>
 
       {/* Minimal Footer */}
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
     </div>
   );
 };

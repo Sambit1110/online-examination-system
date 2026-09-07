@@ -247,7 +247,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
                 }}
               />
             </div>
-            <div style={{ fontSize: '0.72rem', color: isPassed ? '#15803d' : '#991b1b' }}>
+            <div style={{ fontSize: '0.72rem', color: isPassed ? 'var(--color-success)' : 'var(--color-danger)' }}>
               Pass Mark: {exam?.passPercentage || 40}%
             </div>
           </div>
@@ -317,19 +317,19 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
             fontSize: '0.78rem'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#15803d' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--color-success)' }}>
                 <CheckCircle2 size={14} /> Correct:
               </span>
               <strong>{result.correct_count}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#b91c1c' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--color-danger)' }}>
                 <XCircle size={14} /> Incorrect:
               </span>
               <strong>{result.incorrect_count}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#64748b' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-muted)' }}>
                 <HelpCircle size={14} /> Unanswered:
               </span>
               <strong>{result.unanswered_count}</strong>
@@ -377,8 +377,8 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
                         fontWeight: 700,
                         padding: '0.15rem 0.45rem',
                         borderRadius: '2px',
-                        backgroundColor: isCorrect ? '#dcfce7' : (isAnswered ? '#fee2e2' : '#f1f5f9'),
-                        color: isCorrect ? '#15803d' : (isAnswered ? '#b91c1c' : '#64748b'),
+                        backgroundColor: isCorrect ? 'var(--color-success-bg)' : (isAnswered ? 'var(--color-danger-bg)' : 'var(--bg-surface-muted)'),
+                        color: isCorrect ? 'var(--color-success)' : (isAnswered ? 'var(--color-danger)' : 'var(--text-muted)'),
                         fontFamily: 'var(--font-mono)'
                       }}>
                         {isCorrect ? `+${q.marks} Marks` : '0 Marks'}
@@ -391,17 +391,17 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
                         const isOptCorrect = opt.is_correct === true;
 
                         let optBg = 'transparent';
-                        let optBorder = '#e2e8f0';
+                        let optBorder = 'var(--border-subtle)';
                         let icon = null;
 
                         if (isOptCorrect) {
-                          optBg = '#ecfdf5';
-                          optBorder = '#a7f3d0';
-                          icon = <Check size={13} color="#059669" />;
+                          optBg = 'var(--color-success-bg)';
+                          optBorder = 'var(--color-success-border)';
+                          icon = <Check size={13} color="var(--color-success)" />;
                         } else if (isChosen && !isOptCorrect) {
-                          optBg = '#fef2f2';
-                          optBorder = '#fca5a5';
-                          icon = <X size={13} color="#b91c1c" />;
+                          optBg = 'var(--color-danger-bg)';
+                          optBorder = 'var(--color-danger-border)';
+                          icon = <X size={13} color="var(--color-danger)" />;
                         }
 
                         return (
@@ -424,12 +424,12 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                               {isChosen && (
-                                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: isOptCorrect ? '#15803d' : '#b91c1c' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: isOptCorrect ? 'var(--color-success)' : 'var(--color-danger)' }}>
                                   (Candidate Choice)
                                 </span>
                               )}
                               {isOptCorrect && (
-                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#047857' }}>
+                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-success)' }}>
                                   ✓ University Key
                                 </span>
                               )}
@@ -462,7 +462,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
             <div>Institutional Cryptographic Hash: Verified.</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ borderBottom: '1px solid #94a3b8', width: '160px', marginBottom: '0.35rem' }} />
+            <div style={{ borderBottom: '1px solid var(--text-muted)', width: '160px', marginBottom: '0.35rem' }} />
             <strong style={{ color: 'var(--color-brand-primary)' }}>Controller of Examinations</strong>
             <div>Adamas University, Kolkata</div>
           </div>

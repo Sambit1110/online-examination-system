@@ -449,11 +449,11 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
                 </span>
                 <span style={{
                   fontSize: '0.72rem',
-                  backgroundColor: '#f1f5f9',
+                  backgroundColor: 'var(--bg-surface-muted)',
                   padding: '0.15rem 0.45rem',
                   borderRadius: '2px',
                   fontWeight: 600,
-                  color: '#475569'
+                  color: 'var(--text-secondary)'
                 }}>
                   {currentQ.subject}
                 </span>
@@ -478,9 +478,9 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
                     alignItems: 'center',
                     gap: '0.25rem',
                     fontSize: '0.72rem',
-                    color: '#b45309',
-                    backgroundColor: '#fffbeb',
-                    border: '1px solid #fde68a',
+                    color: 'var(--color-warning)',
+                    backgroundColor: 'var(--color-warning-bg)',
+                    border: '1px solid var(--color-warning-border)',
                     padding: '0.2rem 0.45rem',
                     borderRadius: '2px',
                     fontWeight: 600
@@ -578,9 +578,9 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
                     ) : (
                       <span style={{
                         fontSize: '0.68rem',
-                        color: '#94a3b8',
+                        color: 'var(--text-muted)',
                         fontFamily: 'var(--font-mono)',
-                        border: '1px solid #e2e8f0',
+                        border: '1px solid var(--border-subtle)',
                         padding: '0.08rem 0.3rem',
                         borderRadius: '2px'
                       }}>
@@ -607,7 +607,7 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
                 <button
                   onClick={handleToggleMarkForReview}
                   className="btn btn-secondary btn-sm"
-                  style={currentQ.isMarkedForReview ? { backgroundColor: '#fffbeb', borderColor: '#fde68a', color: '#b45309' } : {}}
+                  style={currentQ.isMarkedForReview ? { backgroundColor: 'var(--color-warning-bg)', borderColor: 'var(--color-warning-border)', color: 'var(--color-warning)' } : {}}
                 >
                   <Bookmark size={14} />
                   {currentQ.isMarkedForReview ? 'Unmark Review' : 'Mark for Review'}
@@ -668,7 +668,7 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
                 <span>Answered: <strong>{answeredCount}</strong></span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '2px', backgroundColor: '#cbd5e1' }} />
+                <span style={{ width: 8, height: 8, borderRadius: '2px', backgroundColor: 'var(--border-strong)' }} />
                 <span>Unanswered: <strong>{unansweredCount}</strong></span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -717,7 +717,7 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
                         width: '5px',
                         height: '5px',
                         borderRadius: '50%',
-                        backgroundColor: '#d97706'
+                        backgroundColor: 'var(--color-warning)'
                       }} />
                     )}
                   </button>
@@ -804,12 +804,12 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              color: '#b45309',
+              color: 'var(--color-warning)',
               fontSize: '0.78rem',
-              backgroundColor: '#fffbeb',
+              backgroundColor: 'var(--color-warning-bg)',
               padding: '0.55rem 0.75rem',
               borderRadius: 'var(--radius-xs)',
-              border: '1px solid #fde68a'
+              border: '1px solid var(--color-warning-border)'
             }}>
               <AlertCircle size={15} style={{ flexShrink: 0 }} />
               <span>Notice: You have <strong>{unansweredCount} unanswered questions</strong>. They will receive 0 marks.</span>

@@ -5,6 +5,7 @@ import { Examination } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { Spinner } from '../../components/common/Spinner';
 import { EmptyState } from '../../components/common/EmptyState';
+import { TiltCard } from '../../components/common/TiltCard';
 import {
   Clock,
   Calendar,
@@ -138,9 +139,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       {/* Candidate Academic Dossier Banner */}
-      <div className="card animate-slide-up" style={{
-        backgroundColor: 'var(--bg-surface)',
+      <div className="glass-panel animate-slide-up" style={{
         borderLeft: '4px solid var(--color-action)',
+        borderRadius: 'var(--radius-lg)',
         padding: '1.5rem 2rem',
         display: 'flex',
         justifyContent: 'space-between',
@@ -236,9 +237,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.25rem' }}>
             {liveExams.map((exam, idx) => (
-              <div
+              <TiltCard
                 key={exam.exam_id}
-                className={`card card-hover animate-slide-up stagger-${(idx % 4) + 1}`}
+                maxTilt={4}
+                className={`card animate-slide-up stagger-${(idx % 4) + 1}`}
                 style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderTop: '3px solid var(--color-action)' }}
               >
                 <div>
@@ -300,7 +302,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
                     </>
                   )}
                 </button>
-              </div>
+              </TiltCard>
             ))}
           </div>
         )}

@@ -215,9 +215,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
       {/* Header Banner */}
-      <div className="card animate-slide-up" style={{
-        backgroundColor: 'var(--bg-surface)',
+      <div className="glass-panel animate-slide-up" style={{
         borderLeft: '4px solid var(--color-action)',
+        borderRadius: 'var(--radius-lg)',
         padding: '1.5rem 2rem',
         display: 'flex',
         justifyContent: 'space-between',
@@ -289,7 +289,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
       </div>
 
       {/* Live Exam Activity Monitor — real-time roster of in-progress attempts */}
-      <div className="card animate-slide-up" style={{ padding: '1.25rem' }}>
+      <div className="glass-panel animate-slide-up" style={{ padding: '1.25rem', borderRadius: 'var(--radius-lg)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Radio size={16} color="var(--color-action)" />

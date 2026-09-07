@@ -249,11 +249,11 @@ export const ExamInstructionsPage: React.FC<ExamInstructionsPageProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem',
-            backgroundColor: '#eff6ff',
-            border: '1px solid #bfdbfe',
+            backgroundColor: 'var(--color-accent-cyan-bg)',
+            border: '1px solid var(--color-accent-cyan-border)',
             padding: '0.85rem 1rem',
             borderRadius: 'var(--radius-sm)',
-            color: '#1e40af',
+            color: 'var(--color-accent-cyan)',
             marginBottom: '1.25rem',
             fontSize: '0.84rem'
           }}>
@@ -286,7 +286,7 @@ export const ExamInstructionsPage: React.FC<ExamInstructionsPageProps> = ({
         {/* Formal Attestation Box */}
         <div style={{
           border: '1px solid var(--border-prominent)',
-          backgroundColor: '#fafaf9',
+          backgroundColor: 'var(--bg-surface-secondary)',
           padding: '1rem',
           borderRadius: 'var(--radius-sm)',
           marginBottom: '1.5rem'

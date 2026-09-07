@@ -26,16 +26,16 @@ export const App: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#0b1b3d',
-        color: '#ffffff',
+        backgroundColor: 'var(--bg-page)',
+        color: 'var(--text-main)',
         flexDirection: 'column',
         gap: '1.1rem'
       }}>
         <div
           className="spinner spinner-lg"
-          style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#60a5fa' }}
+          style={{ borderColor: 'rgba(255,255,255,0.12)', borderTopColor: 'var(--color-action)' }}
         />
-        <div style={{ fontSize: '0.9375rem', fontWeight: 600, letterSpacing: '0.06em' }}>
+        <div style={{ fontSize: '0.9375rem', fontWeight: 600, letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
           ADAMAS UNIVERSITY ONLINE EXAMINATION SYSTEM
         </div>
       </div>

@@ -229,7 +229,7 @@ export const SystemBackupPage: React.FC = () => {
                         borderRadius: '4px',
                         fontSize: '0.75rem',
                         fontWeight: 700,
-                        backgroundColor: '#f1f5f9',
+                        backgroundColor: 'var(--bg-surface-muted)',
                         color: 'var(--color-brand-primary)'
                       }}>
                         {l.action}

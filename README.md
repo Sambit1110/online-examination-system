@@ -53,6 +53,9 @@ and which dev command you run — the two modes don't interfere with each other.
   questions to exams, release results, manage user accounts, live
   "who's taking an exam right now" monitor, audit trail
 - Responsive, accessible UI with loading/empty/error states throughout
+- Premium dark theme with a lazy-loaded 3D hero scene on the login page
+  (React Three Fiber), glassmorphic panels, and pointer-driven tilt cards on
+  dashboards — see [Design system](#design-system) below
 
 ---
 
@@ -66,7 +69,32 @@ and which dev command you run — the two modes don't interfere with each other.
 | Admin user management | One Vercel serverless function (`api/admin-users.js`) |
 | Legacy backend (optional) | Node.js, Express, native `node:sqlite`, JWT |
 | Styling | Hand-written CSS design-token system (no UI framework) |
+| 3D | Three.js + React Three Fiber + drei (login hero only, lazy-loaded) |
 | Deployment | Vercel (static SPA + serverless function) |
+
+---
+
+## Design system
+
+The UI is a dark, glassmorphic theme driven entirely by CSS custom
+properties in [src/styles/index.css](src/styles/index.css) — every color,
+shadow, and radius is a token, so the whole app re-themes from one file.
+
+- **Login page**: a lazy-loaded [React Three Fiber](https://docs.pmnd.rs/react-three-fiber)
+  scene ([src/components/three/](src/components/three/)) renders a handful
+  of low-poly floating shapes (no textures, no downloaded models) behind the
+  glass login card. It never loads for authenticated users — `three.js` /
+  `@react-three/fiber` / `@react-three/drei` are code-split into their own
+  chunk pulled in only by the login screen, and are skipped entirely when
+  `prefers-reduced-motion: reduce` is set.
+- **Tilt cards**: [`TiltCard`](src/components/common/TiltCard.tsx) is a
+  small, dependency-free pointer-driven 3D tilt wrapper (no WebGL) used on
+  dashboard stat tiles and the login card. Disabled under reduced motion.
+- **Exam interface is intentionally plain**: no tilt, no 3D canvas, no
+  scroll/hover animation during an active exam — only refined depth via
+  shadows, to keep the highest-stakes screen calm and legible.
+- Respects `prefers-reduced-motion` throughout (`src/hooks/usePrefersReducedMotion.ts`),
+  including disabling all CSS transition/animation durations globally.
 
 ---
 
