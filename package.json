@@ -9,9 +9,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "verify": "node scripts/verify-all.mjs"
+    "verify": "node scripts/verify-all.mjs",
+    "supabase:seed": "node --no-warnings scripts/supabase-seed.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.115.0",
     "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.4",
     "cors": "^2.8.5",

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { supabase } from '../../lib/supabaseClient';
 import { User } from '../../types';
 import { Modal } from '../../components/common/Modal';
 import { Badge } from '../../components/common/Badge';
@@ -45,12 +46,23 @@ export const UserManagementPage: React.FC = () => {
     if (!token) return;
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Failed to load users');
-      const data = await res.json();
-      setUsers(data.users || []);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id:id, name, email, role, roll_number, department')
+        .order('role', { ascending: true })
+        .order('name', { ascending: true });
+      if (profilesError) throw profilesError;
+
+      const { data: attempts } = await supabase.from('exam_attempts').select('user_id');
+      const attemptsByUser = new Map<string, number>();
+      for (const a of attempts || []) {
+        attemptsByUser.set(a.user_id, (attemptsByUser.get(a.user_id) || 0) + 1);
+      }
+
+      setUsers((profiles || []).map((p: any) => ({
+        ...p,
+        attempts_count: attemptsByUser.get(p.user_id) || 0
+      })));
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -71,7 +83,7 @@ export const UserManagementPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await fetch('/api/admin-users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +119,7 @@ export const UserManagementPage: React.FC = () => {
     if (!deleteTarget) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/admin/users/${deleteTarget.user_id}`, {
+      const res = await fetch(`/api/admin-users?id=${encodeURIComponent(deleteTarget.user_id)}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

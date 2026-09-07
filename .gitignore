@@ -1,6 +1,11 @@
 node_modules/
 dist/
 .env
+.env.local
 data/*.db
 data/*.db-shm
 data/*.db-wal
+
+# Supabase CLI local artifacts (if you use `supabase start` locally)
+supabase/.temp/
+supabase/.branches/

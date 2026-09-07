@@ -1,5 +1,16 @@
+// ==========================================================
+// Shared frontend types for the Supabase-backed schema.
+//
+// Convention: every query (RPC or direct table select) aliases Postgres's
+// `id` column to a domain-prefixed name (question_id, exam_id, attempt_id,
+// option_id, result_id, log_id) via PostgREST's `alias:column` select
+// syntax. This keeps IDs self-describing when tables are joined, and keeps
+// this type file — and most of the page logic that already existed before
+// the Supabase migration — essentially unchanged in shape.
+// ==========================================================
+
 export interface User {
-  id: string;
+  id: string; // == auth.users.id == profiles.id
   name: string;
   email: string;
   role: 'student' | 'admin';
@@ -11,12 +22,12 @@ export interface Option {
   option_id: string;
   question_id: string;
   option_text: string;
-  is_correct?: number | boolean; // Only visible to admin!
+  is_correct?: boolean; // Only ever populated for admins, or post-release review
+  sort_order?: number;
 }
 
 export interface Question {
   question_id: string;
-  exam_id: string | null;
   question_text: string;
   marks: number;
   question_type: string;
@@ -28,8 +39,9 @@ export interface Question {
   isMarkedForReview?: boolean;
   correctOptionId?: string | null;
   isCandidateCorrect?: boolean;
-  // Present on the results-review payload (raw SQL column, not camelCased server-side)
+  // Present on the results-review payload (raw column name from the RPC)
   selected_option_id?: string | null;
+  exam_count?: number; // how many exams this bank question is currently assigned to
 }
 
 export interface Examination {
@@ -43,7 +55,7 @@ export interface Examination {
   pass_percentage: number;
   negative_marks_per_question: number;
   status: 'draft' | 'scheduled' | 'live' | 'completed' | 'released';
-  results_released: number;
+  results_released: boolean;
   question_count?: number;
   attempt_status?: 'in_progress' | 'submitted' | 'timed_out' | null;
   attempt_id?: string | null;
@@ -66,7 +78,7 @@ export interface ExamAttempt {
   submitted_at?: string;
 }
 
-// Live admin monitoring — GET /api/admin/live-attempts
+// Live admin monitoring — direct Supabase query against exam_attempts
 export interface LiveAttempt {
   attemptId: string;
   studentName: string;
@@ -94,7 +106,7 @@ export interface Result {
   unanswered_count: number;
   evaluated_at: string;
   exam_title?: string;
-  results_released?: number;
+  results_released?: boolean;
   pass_percentage?: number;
   duration_minutes?: number;
   student_name?: string;
@@ -104,9 +116,8 @@ export interface Result {
 }
 
 // Exam-session integrity monitoring (tab/window focus signals only — no
-// webcam/mic/screen capture). Structured client-side; bridged to the server
-// via the existing audit log so it can later move to a dedicated table
-// without changing this shape.
+// webcam/mic/screen capture). Structured client-side; persisted to the
+// dedicated integrity_events table (see supabase/migrations/0001_schema.sql).
 export type IntegrityEventType = 'tab_hidden' | 'tab_visible' | 'window_blur' | 'window_focus';
 
 export interface IntegrityEvent {

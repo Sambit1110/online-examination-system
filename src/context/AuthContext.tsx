@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabaseClient';
 import { User } from '../types';
 
 interface AuthContextType {
@@ -13,70 +15,89 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const loadProfile = async (session: Session): Promise<User | null> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, name, role, roll_number, department')
+    .eq('id', session.user.id)
+    .single();
+
+  if (error || !data) {
+    console.error('Failed to load user profile:', error);
+    return null;
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+    email: session.user.email || '',
+    role: data.role,
+    rollNumber: data.roll_number,
+    department: data.department
+  };
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('oes_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem('oes_token');
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Validate session on mount
-    const verifyMe = async () => {
-      if (!token) {
-        setLoading(false);
-        return;
+    let mounted = true;
+
+    // Restore any existing session on first load (page refresh, new tab, etc.)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+      if (session) {
+        const profile = await loadProfile(session);
+        if (!mounted) return;
+        setUser(profile);
+        setToken(session.access_token);
       }
-      try {
-        const res = await fetch('/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-          localStorage.setItem('oes_user', JSON.stringify(data.user));
-        } else {
-          // Token expired or invalid
-          logout();
-        }
-      } catch (err) {
-        console.error('Session validation error:', err);
-      } finally {
-        setLoading(false);
+      setLoading(false);
+    });
+
+    // Keep the session in sync across tabs, token refreshes, and sign-outs.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      if (session) {
+        const profile = await loadProfile(session);
+        if (!mounted) return;
+        setUser(profile);
+        setToken(session.access_token);
+      } else {
+        setUser(null);
+        setToken(null);
       }
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
     };
+  }, []);
 
-    verifyMe();
-  }, [token]);
-
-  const login = async (email: string, pass: string) => {
+  const login = async (identifier: string, password: string) => {
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: pass })
+      // Students may sign in with either their email or roll number.
+      const { data: resolvedEmail, error: resolveError } = await supabase.rpc('resolve_login_email', {
+        p_identifier: identifier.trim()
       });
 
-      const contentType = res.headers.get('content-type') || '';
-      let data: any = {};
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        return { success: false, error: `API endpoint error (${res.status}): ${text.slice(0, 60)}` };
+      if (resolveError || !resolvedEmail) {
+        return { success: false, error: 'Invalid email/roll number or password.' };
       }
 
-      if (!res.ok) {
-        return { success: false, error: data.error || 'Authentication failed' };
+      const { error } = await supabase.auth.signInWithPassword({
+        email: resolvedEmail,
+        password
+      });
+
+      if (error) {
+        return { success: false, error: 'Invalid email/roll number or password.' };
       }
 
-      setUser(data.user);
-      setToken(data.token);
-      localStorage.setItem('oes_user', JSON.stringify(data.user));
-      localStorage.setItem('oes_token', data.token);
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Network connection failed' };
@@ -84,16 +105,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    if (token) {
-      fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      }).catch(() => {});
-    }
+    supabase.auth.signOut();
     setUser(null);
     setToken(null);
-    localStorage.removeItem('oes_user');
-    localStorage.removeItem('oes_token');
   };
 
   return (

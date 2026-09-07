@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 import { Result, Examination, IntegritySummary, IntegrityEvent } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { Spinner } from '../../components/common/Spinner';
@@ -33,9 +34,9 @@ const INTEGRITY_EVENT_LABELS: Record<IntegrityEvent['type'], { label: string; ic
 };
 
 export const AdminResultsPage: React.FC = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [exams, setExams] = useState<Examination[]>([]);
-  const [selectedExamId, setSelectedExamId] = useState<string>('EXAM-CS201');
+  const [selectedExamId, setSelectedExamId] = useState<string>('');
   const [results, setResults] = useState<Result[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [integrityByAttempt, setIntegrityByAttempt] = useState<Record<string, IntegritySummary>>({});
@@ -46,37 +47,97 @@ export const AdminResultsPage: React.FC = () => {
 
   useEffect(() => {
     const fetchExamList = async () => {
-      if (!token) return;
+      if (!user) return;
       try {
-        const res = await fetch('/api/exams/admin', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const d = await res.json();
-          setExams(d.examinations || []);
-          if (d.examinations && d.examinations.length > 0 && !selectedExamId) {
-            setSelectedExamId(d.examinations[0].exam_id);
-          }
+        const { data } = await supabase
+          .from('examinations')
+          .select('exam_id:id, title, results_released')
+          .order('created_at', { ascending: false });
+        setExams((data || []) as Examination[]);
+        if (data && data.length > 0 && !selectedExamId) {
+          setSelectedExamId(data[0].exam_id);
         }
       } catch (err) {
         console.error(err);
       }
     };
     fetchExamList();
-  }, [token]);
+  }, [user?.id]);
 
   const fetchExamResults = async (examId: string) => {
-    if (!token || !examId) return;
+    if (!user || !examId) return;
     try {
       setLoading(true);
-      const res = await fetch(`/api/results/admin/exam/${examId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+
+      const [resultsRes, eventsRes] = await Promise.all([
+        supabase
+          .from('results')
+          .select(`
+            result_id:id, attempt_id, marks_obtained, total_marks, percentage, status,
+            total_questions, correct_count, incorrect_count, unanswered_count, evaluated_at,
+            profiles(name, roll_number, email)
+          `)
+          .eq('exam_id', examId)
+          .order('marks_obtained', { ascending: false }),
+        supabase
+          .from('integrity_events')
+          .select('attempt_id, event_type, away_ms, occurred_at')
+          .eq('exam_id', examId)
+          .order('occurred_at', { ascending: true })
+      ]);
+
+      if (resultsRes.error) throw resultsRes.error;
+
+      const mappedResults: Result[] = (resultsRes.data || []).map((r: any) => ({
+        result_id: r.result_id,
+        attempt_id: r.attempt_id,
+        user_id: '',
+        exam_id: examId,
+        marks_obtained: r.marks_obtained,
+        total_marks: r.total_marks,
+        percentage: r.percentage,
+        status: r.status,
+        total_questions: r.total_questions,
+        correct_count: r.correct_count,
+        incorrect_count: r.incorrect_count,
+        unanswered_count: r.unanswered_count,
+        evaluated_at: r.evaluated_at,
+        student_name: r.profiles?.name,
+        student_email: r.profiles?.email,
+        roll_number: r.profiles?.roll_number
+      }));
+      setResults(mappedResults);
+
+      const examTitle = exams.find(e => e.exam_id === examId)?.title;
+      const byAttempt: Record<string, IntegritySummary> = {};
+      for (const evt of eventsRes.data || []) {
+        if (!byAttempt[evt.attempt_id]) {
+          byAttempt[evt.attempt_id] = {
+            attemptId: evt.attempt_id, examId, examTitle,
+            totalEvents: 0, tabHiddenCount: 0, windowBlurCount: 0, totalAwayMs: 0,
+            events: [], generatedAt: new Date().toISOString()
+          };
+        }
+        const summary = byAttempt[evt.attempt_id];
+        summary.totalEvents += 1;
+        if (evt.event_type === 'tab_hidden') summary.tabHiddenCount += 1;
+        if (evt.event_type === 'window_blur') summary.windowBlurCount += 1;
+        summary.totalAwayMs += evt.away_ms || 0;
+        summary.events.push({ type: evt.event_type, timestamp: evt.occurred_at, awayMs: evt.away_ms ?? undefined });
+      }
+      setIntegrityByAttempt(byAttempt);
+
+      const total = mappedResults.length;
+      const passed = mappedResults.filter(r => r.status === 'pass').length;
+      const percentages = mappedResults.map(r => r.percentage);
+      setStats({
+        totalCandidates: total,
+        passedCandidates: passed,
+        failedCandidates: total - passed,
+        averagePercentage: total > 0 ? Math.round((percentages.reduce((a, b) => a + b, 0) / total) * 100) / 100 : 0,
+        highestPercentage: total > 0 ? Math.max(...percentages) : 0,
+        lowestPercentage: total > 0 ? Math.min(...percentages) : 0
       });
-      if (!res.ok) throw new Error('Failed to fetch results');
-      const data = await res.json();
-      setResults(data.results || []);
-      setStats(data.stats || null);
-      setIntegrityByAttempt(data.integrityByAttempt || {});
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -88,7 +149,7 @@ export const AdminResultsPage: React.FC = () => {
     if (selectedExamId) {
       fetchExamResults(selectedExamId);
     }
-  }, [selectedExamId, token]);
+  }, [selectedExamId, user?.id]);
 
   const filteredResults = results.filter(r => {
     if (!searchTerm) return true;
@@ -102,29 +163,30 @@ export const AdminResultsPage: React.FC = () => {
 
   const handleToggleRelease = async () => {
     const currentExam = exams.find(e => e.exam_id === selectedExamId);
-    if (!currentExam) return;
-    const nextState = currentExam.results_released !== 1;
+    if (!currentExam || !user) return;
+    const nextState = !currentExam.results_released;
 
     try {
-      const res = await fetch(`/api/exams/${selectedExamId}/release-results`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ release: nextState })
+      const { error: updateError } = await supabase
+        .from('examinations')
+        .update({ results_released: nextState, status: nextState ? 'released' : 'completed' })
+        .eq('id', selectedExamId);
+      if (updateError) throw updateError;
+
+      await supabase.from('audit_logs').insert({
+        user_id: user.id,
+        action: nextState ? 'RELEASE_RESULTS' : 'UNRELEASE_RESULTS',
+        details: { examId: selectedExamId }
       });
-      if (res.ok) {
-        // Update local exams list
-        setExams(exams.map(e => e.exam_id === selectedExamId ? { ...e, results_released: nextState ? 1 : 0 } : e));
-      }
+
+      setExams(exams.map(e => e.exam_id === selectedExamId ? { ...e, results_released: nextState } : e));
     } catch (err) {
       console.error(err);
     }
   };
 
   const currentExam = exams.find(e => e.exam_id === selectedExamId);
-  const isReleased = currentExam?.results_released === 1;
+  const isReleased = !!currentExam?.results_released;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

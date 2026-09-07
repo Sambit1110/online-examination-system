@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { Question, IntegrityEvent, IntegritySummary } from '../../types';
+import { supabase } from '../../lib/supabaseClient';
+import { Question, IntegrityEvent } from '../../types';
 import { Modal } from '../../components/common/Modal';
 import { Spinner } from '../../components/common/Spinner';
 import {
@@ -30,7 +31,7 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
   examId,
   onFinishExam
 }) => {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [examTitle, setExamTitle] = useState<string>('');
@@ -49,42 +50,37 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
   const secondsRef = useRef(secondsRemaining);
   secondsRef.current = secondsRemaining;
   const totalSecondsRef = useRef<number | null>(null);
-  // Mirrors integrityEvents for closures (interval/submit handlers) that would
-  // otherwise capture a stale array — same pattern already used by secondsRef.
-  const integrityEventsRef = useRef<IntegrityEvent[]>([]);
-  integrityEventsRef.current = integrityEvents;
 
   useEffect(() => {
     const loadExamQuestions = async () => {
-      if (!token) return;
+      if (!user) return;
       try {
         setLoading(true);
-        const res = await fetch(`/api/conduct/questions/${examId}`, {
-          headers: { Authorization: `Bearer ${token}` }
+        const { data, error: rpcError } = await supabase.rpc('get_exam_questions_for_student', {
+          p_exam_id: examId
         });
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || 'Failed to load examination questions');
-        }
-        const data = await res.json();
-        setQuestions(data.questions || []);
-        if (data.exam) {
-          setExamTitle(data.exam.title);
-        }
-        if (data.attempt) {
+        if (rpcError) throw rpcError;
+        setQuestions(data?.questions || []);
+        const { data: examRow } = await supabase
+          .from('examinations')
+          .select('title')
+          .eq('id', examId)
+          .single();
+        if (examRow) setExamTitle(examRow.title);
+        if (data?.attempt) {
           setAttemptId(data.attempt.attemptId);
           setSecondsRemaining(data.attempt.timeRemainingSeconds);
           totalSecondsRef.current = data.attempt.timeRemainingSeconds;
         }
       } catch (err: any) {
-        setError(err.message);
+        setError(err.message || 'Failed to load examination questions');
       } finally {
         setLoading(false);
       }
     };
 
     loadExamQuestions();
-  }, [examId, token]);
+  }, [examId, user?.id]);
 
   // ==========================================================
   // EXAM INTEGRITY MONITORING (tab/window focus only — no
@@ -94,15 +90,32 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
   // submission payload for administrative review.
   // ==========================================================
   useEffect(() => {
-    if (loading || !attemptId) return;
+    if (loading || !attemptId || !user) return;
 
     const pushEvent = (type: IntegrityEvent['type'], awayMs?: number) => {
+      const occurredAt = new Date().toISOString();
       setIntegrityEvents(prev => {
         if (prev.length >= MAX_INTEGRITY_EVENTS) return prev;
-        const next: IntegrityEvent = { type, timestamp: new Date().toISOString() };
+        const next: IntegrityEvent = { type, timestamp: occurredAt };
         if (typeof awayMs === 'number') next.awayMs = awayMs;
         return [...prev, next];
       });
+
+      // Persist live so admins can watch the trail build in real time —
+      // fire-and-forget: a logging hiccup must never interrupt the exam.
+      supabase
+        .from('integrity_events')
+        .insert({
+          attempt_id: attemptId,
+          user_id: user.id,
+          exam_id: examId,
+          event_type: type,
+          away_ms: typeof awayMs === 'number' ? Math.round(awayMs) : null,
+          occurred_at: occurredAt
+        })
+        .then(({ error: insertError }) => {
+          if (insertError) console.error('Integrity event logging failed (non-fatal):', insertError);
+        });
     };
 
     let hiddenAt: number | null = null;
@@ -139,29 +152,7 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [loading, attemptId]);
-
-  // Builds the structured summary attached to a submission. Reads from the
-  // ref (not the `integrityEvents` state directly) so it always reflects the
-  // latest events even when called from a long-lived closure (e.g. the
-  // auto-timeout submit path set up inside the countdown interval).
-  const buildIntegritySummary = (): IntegritySummary => {
-    const events = integrityEventsRef.current;
-    const tabHiddenCount = events.filter(e => e.type === 'tab_hidden').length;
-    const windowBlurCount = events.filter(e => e.type === 'window_blur').length;
-    const totalAwayMs = events.reduce((sum, e) => sum + (e.awayMs || 0), 0);
-    return {
-      attemptId: attemptId || '',
-      examId,
-      examTitle,
-      totalEvents: events.length,
-      tabHiddenCount,
-      windowBlurCount,
-      totalAwayMs,
-      events,
-      generatedAt: new Date().toISOString()
-    };
-  };
+  }, [loading, attemptId, user?.id, examId]);
 
   useEffect(() => {
     if (loading || secondsRemaining <= 0) return;
@@ -186,14 +177,7 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
     if (submitting || !attemptId) return;
     setSubmitting(true);
     try {
-      await fetch('/api/conduct/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ attemptId, isTimeout: true, integritySummary: buildIntegritySummary() })
-      });
+      await supabase.rpc('submit_exam_attempt', { p_attempt_id: attemptId, p_is_timeout: true });
       onFinishExam(examId);
     } catch (err) {
       console.error('Timeout auto-submit error:', err);
@@ -228,28 +212,17 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
     optId: string | null,
     isMarked: boolean
   ) => {
-    if (!attemptId || !token) return;
+    if (!attemptId) return;
     setAutosaveStatus('saving');
     try {
-      const res = await fetch('/api/conduct/save-answer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          attemptId,
-          questionId: qId,
-          selectedOptionId: optId,
-          isMarkedForReview: isMarked,
-          timeRemainingSeconds: secondsRef.current
-        })
+      const { error: rpcError } = await supabase.rpc('save_answer', {
+        p_attempt_id: attemptId,
+        p_question_id: qId,
+        p_selected_option_id: optId,
+        p_is_marked_for_review: isMarked,
+        p_time_remaining_seconds: secondsRef.current
       });
-      if (res.ok) {
-        setAutosaveStatus('saved');
-      } else {
-        setAutosaveStatus('error');
-      }
+      setAutosaveStatus(rpcError ? 'error' : 'saved');
     } catch (err) {
       setAutosaveStatus('error');
     }
@@ -283,20 +256,15 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
     if (!attemptId || submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch('/api/conduct/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ attemptId, isTimeout: false, integritySummary: buildIntegritySummary() })
+      const { error: rpcError } = await supabase.rpc('submit_exam_attempt', {
+        p_attempt_id: attemptId,
+        p_is_timeout: false
       });
-      if (res.ok) {
+      if (!rpcError) {
         setIsSubmitModalOpen(false);
         onFinishExam(examId);
       } else {
-        const d = await res.json();
-        toast.error(d.error || 'Failed to submit examination');
+        toast.error(rpcError.message || 'Failed to submit examination');
         setSubmitting(false);
       }
     } catch (err: any) {

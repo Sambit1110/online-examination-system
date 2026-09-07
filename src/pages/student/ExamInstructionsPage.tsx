@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 import { Examination } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { Spinner } from '../../components/common/Spinner';
@@ -26,7 +27,7 @@ export const ExamInstructionsPage: React.FC<ExamInstructionsPageProps> = ({
   onProceedToExam,
   onBack
 }) => {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [exam, setExam] = useState<Examination | null>(null);
   const [rules, setRules] = useState<string[]>([]);
   const [scheduleStatus, setScheduleStatus] = useState<string>('');
@@ -37,20 +38,60 @@ export const ExamInstructionsPage: React.FC<ExamInstructionsPageProps> = ({
 
   useEffect(() => {
     const fetchInstructions = async () => {
-      if (!token) return;
+      if (!user) return;
       try {
         setLoading(true);
-        const res = await fetch(`/api/exams/instructions/${examId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || 'Failed to load instructions');
+
+        const [examRes, countRes, attemptRes] = await Promise.all([
+          supabase
+            .from('examinations')
+            .select('exam_id:id, title, description, duration_minutes, start_time, end_time, total_marks, pass_percentage, negative_marks_per_question, status, results_released')
+            .eq('id', examId)
+            .single(),
+          supabase
+            .from('exam_questions')
+            .select('question_id', { count: 'exact', head: true })
+            .eq('exam_id', examId),
+          supabase
+            .from('exam_attempts')
+            .select('status')
+            .eq('exam_id', examId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+        ]);
+
+        if (examRes.error) throw new Error('Examination not found.');
+
+        const examData = examRes.data as Examination;
+        setExam(examData);
+
+        const now = new Date();
+        const start = new Date(examData.start_time);
+        const end = new Date(examData.end_time);
+
+        let status = 'permitted';
+        if (attemptRes.data && (attemptRes.data.status === 'submitted' || attemptRes.data.status === 'timed_out')) {
+          status = 'already_submitted';
+        } else if (now < start) {
+          status = 'not_started_yet';
+        } else if (now > end) {
+          status = 'access_period_ended';
         }
-        const data = await res.json();
-        setExam(data.exam);
-        setRules(data.rules || []);
-        setScheduleStatus(data.scheduleStatus);
+        setScheduleStatus(status);
+
+        const questionCount = countRes.count || 0;
+        setRules([
+          `Total duration: ${examData.duration_minutes} minutes. Timer starts immediately upon clicking "Begin Examination".`,
+          `The question palette allows free navigation between all ${questionCount} questions.`,
+          `You may change your selected option at any time before final submission.`,
+          examData.negative_marks_per_question > 0
+            ? `Negative marking is ACTIVE: -${examData.negative_marks_per_question} marks will be deducted for each incorrect answer.`
+            : 'There is NO negative marking for incorrect responses.',
+          'Unanswered questions receive zero marks.',
+          'Automatic submission will be enforced once the countdown timer reaches 00:00:00.',
+          'Do not refresh or close the browser tab. Your responses are continuously synchronized in real-time.',
+          'Once submitted, your examination is permanently locked and cannot be reopened.'
+        ]);
       } catch (err: any) {
         setError(err.message || 'Error loading examination instructions');
       } finally {
@@ -59,7 +100,7 @@ export const ExamInstructionsPage: React.FC<ExamInstructionsPageProps> = ({
     };
 
     fetchInstructions();
-  }, [examId, token]);
+  }, [examId, user?.id]);
 
   const handleStartExam = async () => {
     if (!confirmedDeclaration) return;
@@ -67,22 +108,11 @@ export const ExamInstructionsPage: React.FC<ExamInstructionsPageProps> = ({
     setError(null);
 
     try {
-      const res = await fetch(`/api/conduct/start/${examId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to start examination');
-      }
-
+      const { error: rpcError } = await supabase.rpc('start_exam_attempt', { p_exam_id: examId });
+      if (rpcError) throw rpcError;
       onProceedToExam();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Failed to start examination');
       setStarting(false);
     }
   };

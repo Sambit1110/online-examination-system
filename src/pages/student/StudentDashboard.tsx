@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 import { Examination } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { Spinner } from '../../components/common/Spinner';
@@ -24,22 +25,91 @@ interface StudentDashboardProps {
   onViewResult: (examId: string) => void;
 }
 
+// Access-window logic (BR-02/BR-03) — mirrors the same rules the RPCs
+// enforce authoritatively server-side; this is purely presentational.
+const computeAccessState = (
+  exam: { start_time: string; end_time: string },
+  attemptStatus: Examination['attempt_status']
+): { accessState: Examination['accessState']; canStart: boolean } => {
+  if (attemptStatus === 'submitted' || attemptStatus === 'timed_out') {
+    return { accessState: 'completed', canStart: false };
+  }
+  if (attemptStatus === 'in_progress') {
+    return { accessState: 'in_progress', canStart: true };
+  }
+  const now = new Date();
+  if (now < new Date(exam.start_time)) return { accessState: 'upcoming', canStart: false };
+  if (now > new Date(exam.end_time)) return { accessState: 'expired', canStart: false };
+  return { accessState: 'live', canStart: true };
+};
+
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam, onViewResult }) => {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [exams, setExams] = useState<Examination[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchExams = async () => {
-    if (!token) return;
+    if (!user) return;
     try {
       setLoading(true);
-      const res = await fetch('/api/exams/student', {
-        headers: { Authorization: `Bearer ${token}` }
+
+      const [examsRes, attemptsRes, resultsRes] = await Promise.all([
+        supabase
+          .from('examinations')
+          .select(`
+            exam_id:id, title, description, duration_minutes, start_time, end_time,
+            total_marks, pass_percentage, negative_marks_per_question, status, results_released,
+            exam_questions(count)
+          `)
+          .order('start_time', { ascending: true }),
+        supabase
+          .from('exam_attempts')
+          .select('exam_id, attempt_id:id, status')
+          .eq('user_id', user.id),
+        supabase
+          .from('results')
+          .select('exam_id, result_id:id, marks_obtained, percentage, status')
+          .eq('user_id', user.id)
+      ]);
+
+      if (examsRes.error) throw examsRes.error;
+      if (attemptsRes.error) throw attemptsRes.error;
+      if (resultsRes.error) throw resultsRes.error;
+
+      const attemptByExam = new Map((attemptsRes.data || []).map((a: any) => [a.exam_id, a]));
+      const resultByExam = new Map((resultsRes.data || []).map((r: any) => [r.exam_id, r]));
+
+      const processed: Examination[] = (examsRes.data || []).map((e: any) => {
+        const attempt = attemptByExam.get(e.exam_id);
+        const result = resultByExam.get(e.exam_id);
+        const { accessState, canStart } = computeAccessState(e, attempt?.status ?? null);
+        return {
+          exam_id: e.exam_id,
+          title: e.title,
+          description: e.description,
+          duration_minutes: e.duration_minutes,
+          start_time: e.start_time,
+          end_time: e.end_time,
+          total_marks: e.total_marks,
+          pass_percentage: e.pass_percentage,
+          negative_marks_per_question: e.negative_marks_per_question,
+          status: e.status,
+          results_released: e.results_released,
+          question_count: e.exam_questions?.[0]?.count ?? 0,
+          attempt_status: attempt?.status ?? null,
+          attempt_id: attempt?.attempt_id ?? null,
+          result_id: result?.result_id ?? null,
+          marks_obtained: result?.marks_obtained ?? null,
+          percentage: result?.percentage ?? null,
+          result_status: result?.status ?? null,
+          accessState,
+          canStart,
+          isReleased: e.results_released === true
+        };
       });
-      if (!res.ok) throw new Error('Failed to fetch scheduled examinations');
-      const data = await res.json();
-      setExams(data.examinations || []);
+
+      setExams(processed);
     } catch (err: any) {
       setError(err.message || 'Error loading dashboard');
     } finally {
@@ -49,7 +119,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
 
   useEffect(() => {
     fetchExams();
-  }, [token]);
+  }, [user?.id]);
 
   if (loading) {
     return <Spinner label="Loading candidate examination roster..." />;
@@ -346,12 +416,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
                         <strong style={{ fontFamily: 'var(--font-mono)' }}>{exam.total_marks} Marks</strong>
                       </td>
                       <td>
-                        <Badge type={exam.results_released === 1 ? 'released' : 'completed'}>
-                          {exam.results_released === 1 ? 'Results Released' : 'Under Evaluation'}
+                        <Badge type={exam.results_released ? 'released' : 'completed'}>
+                          {exam.results_released ? 'Results Released' : 'Under Evaluation'}
                         </Badge>
                       </td>
                       <td>
-                        {exam.results_released === 1 && typeof exam.marks_obtained === 'number' ? (
+                        {exam.results_released && typeof exam.marks_obtained === 'number' ? (
                           <div style={{ fontWeight: 700, color: exam.result_status === 'pass' ? 'var(--color-success)' : 'var(--color-danger)' }}>
                             {exam.marks_obtained} / {exam.total_marks} ({exam.percentage}%)
                           </div>
@@ -365,7 +435,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
                           className="btn btn-secondary btn-sm"
                         >
                           <Award size={14} color="var(--color-action)" />
-                          {exam.results_released === 1 ? 'View Grade Slip' : 'View Submission'}
+                          {exam.results_released ? 'View Grade Slip' : 'View Submission'}
                         </button>
                       </td>
                     </tr>

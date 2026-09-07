@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 import { Result, Question } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { Spinner } from '../../components/common/Spinner';
@@ -27,7 +28,7 @@ interface StudentResultPageProps {
 }
 
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, onBack }) => {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [result, setResult] = useState<Result | null>(null);
   const [exam, setExam] = useState<any>(null);
   const [questionReview, setQuestionReview] = useState<Question[] | null>(null);
@@ -36,48 +37,47 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
 
   useEffect(() => {
     const fetchResultData = async () => {
-      if (!token) return;
+      if (!user) return;
       try {
         setLoading(true);
 
-        if (examId) {
-          const res = await fetch(`/api/results/exam/${examId}/my`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (!res.ok) {
-            const d = await res.json();
-            throw new Error(d.error || 'Failed to fetch result');
-          }
-          const data = await res.json();
-          setResult(data.result);
-          setExam(data.exam);
-          setQuestionReview(data.questionReview);
+        let targetExamId = examId;
+        if (!targetExamId) {
+          const { data: latest } = await supabase
+            .from('results')
+            .select('exam_id')
+            .eq('user_id', user.id)
+            .order('evaluated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          targetExamId = latest?.exam_id;
+        }
 
-          if (data.result && data.result.status === 'pass') {
-            confetti({
-              particleCount: 70,
-              spread: 50,
-              origin: { y: 0.6 }
-            });
-          }
-        } else {
-          const res = await fetch('/api/results/my', {
-            headers: { Authorization: `Bearer ${token}` }
+        if (!targetExamId) {
+          setLoading(false);
+          return;
+        }
+
+        const { data, error: rpcError } = await supabase.rpc('get_result_review', {
+          p_exam_id: targetExamId
+        });
+        if (rpcError) throw rpcError;
+
+        setResult(data.result);
+        setExam(data.exam);
+        setQuestionReview(
+          (data.questionReview || []).map((q: Question) => ({
+            ...q,
+            isCandidateCorrect: q.selected_option_id === q.correctOptionId
+          }))
+        );
+
+        if (data.result && data.result.status === 'pass') {
+          confetti({
+            particleCount: 70,
+            spread: 50,
+            origin: { y: 0.6 }
           });
-          if (!res.ok) throw new Error('Failed to fetch results');
-          const data = await res.json();
-          if (data.results && data.results.length > 0) {
-            const latest = data.results[0];
-            const detailRes = await fetch(`/api/results/exam/${latest.exam_id}/my`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            if (detailRes.ok) {
-              const detailData = await detailRes.json();
-              setResult(detailData.result);
-              setExam(detailData.exam);
-              setQuestionReview(detailData.questionReview);
-            }
-          }
         }
       } catch (err: any) {
         setError(err.message);
@@ -87,7 +87,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
     };
 
     fetchResultData();
-  }, [examId, token]);
+  }, [examId, user?.id]);
 
   const handlePrint = () => {
     window.print();
@@ -388,7 +388,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
                       {q.options.map((opt, optIdx) => {
                         const isChosen = q.selected_option_id === opt.option_id;
-                        const isOptCorrect = opt.is_correct === 1;
+                        const isOptCorrect = opt.is_correct === true;
 
                         let optBg = 'transparent';
                         let optBorder = '#e2e8f0';

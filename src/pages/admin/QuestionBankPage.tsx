@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { supabase } from '../../lib/supabaseClient';
 import { Question } from '../../types';
 import { Modal } from '../../components/common/Modal';
 import { Badge } from '../../components/common/Badge';
@@ -22,7 +23,7 @@ import {
 } from 'lucide-react';
 
 export const QuestionBankPage: React.FC = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,21 +58,39 @@ export const QuestionBankPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const fetchQuestions = async () => {
-    if (!token) return;
+    if (!user) return;
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (search) params.set('search', search);
-      if (subjectFilter) params.set('subject', subjectFilter);
-      if (difficultyFilter) params.set('difficulty', difficultyFilter);
-      if (statusFilter) params.set('status', statusFilter);
+      let query = supabase
+        .from('questions')
+        .select(`
+          question_id:id, question_text, marks, question_type, subject, difficulty, status, created_at,
+          question_options(option_id:id, question_id, option_text, is_correct, sort_order),
+          exam_questions(count)
+        `)
+        .order('created_at', { ascending: false });
 
-      const res = await fetch(`/api/questions?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Failed to fetch questions');
-      const data = await res.json();
-      setQuestions(data.questions || []);
+      if (search) query = query.ilike('question_text', `%${search}%`);
+      if (subjectFilter) query = query.eq('subject', subjectFilter);
+      if (difficultyFilter) query = query.eq('difficulty', difficultyFilter);
+      if (statusFilter) query = query.eq('status', statusFilter);
+
+      const { data, error: queryError } = await query;
+      if (queryError) throw queryError;
+
+      const mapped: Question[] = (data || []).map((q: any) => ({
+        question_id: q.question_id,
+        question_text: q.question_text,
+        marks: q.marks,
+        question_type: q.question_type,
+        subject: q.subject,
+        difficulty: q.difficulty,
+        status: q.status,
+        options: q.question_options || [],
+        exam_count: q.exam_questions?.[0]?.count ?? 0
+      }));
+
+      setQuestions(mapped);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -81,7 +100,7 @@ export const QuestionBankPage: React.FC = () => {
 
   useEffect(() => {
     fetchQuestions();
-  }, [token, search, subjectFilter, difficultyFilter, statusFilter]);
+  }, [user?.id, search, subjectFilter, difficultyFilter, statusFilter]);
 
   const openAddModal = () => {
     setFormQuestionText('');
@@ -111,7 +130,7 @@ export const QuestionBankPage: React.FC = () => {
         ? q.options.map(o => ({
             option_id: o.option_id,
             option_text: o.option_text,
-            is_correct: o.is_correct === 1 || o.is_correct === true ? 1 : 0
+            is_correct: o.is_correct ? 1 : 0
           }))
         : [
             { option_text: '', is_correct: 1 },
@@ -180,35 +199,71 @@ export const QuestionBankPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const url = isEdit ? `/api/questions/${activeEditingId}` : '/api/questions';
-      const method = isEdit ? 'PUT' : 'POST';
+      const validOpts = formOptions.filter(o => o.option_text.trim());
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          question_text: formQuestionText,
-          marks: marksNum,
-          subject: formSubject,
-          difficulty: formDifficulty,
-          status: formStatus,
-          options: formOptions
-        })
-      });
+      let questionId = activeEditingId;
+      if (isEdit && questionId) {
+        const { error: updateError } = await supabase
+          .from('questions')
+          .update({
+            question_text: formQuestionText.trim(),
+            marks: marksNum,
+            subject: formSubject.trim(),
+            difficulty: formDifficulty,
+            status: formStatus
+          })
+          .eq('id', questionId);
+        if (updateError) throw updateError;
 
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || 'Failed to save question');
+        // Replace options wholesale — simplest way to keep them in sync
+        // with the form, matching the original app's edit semantics.
+        const { error: deleteOptsError } = await supabase
+          .from('question_options')
+          .delete()
+          .eq('question_id', questionId);
+        if (deleteOptsError) throw deleteOptsError;
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from('questions')
+          .insert({
+            question_text: formQuestionText.trim(),
+            marks: marksNum,
+            subject: formSubject.trim(),
+            difficulty: formDifficulty,
+            status: 'active',
+            created_by: user?.id
+          })
+          .select('id')
+          .single();
+        if (insertError) throw insertError;
+        questionId = inserted.id;
+      }
+
+      const { error: optsInsertError } = await supabase
+        .from('question_options')
+        .insert(
+          validOpts.map((o, idx) => ({
+            question_id: questionId,
+            option_text: o.option_text.trim(),
+            is_correct: o.is_correct === 1,
+            sort_order: idx
+          }))
+        );
+      if (optsInsertError) throw optsInsertError;
+
+      if (user) {
+        await supabase.from('audit_logs').insert({
+          user_id: user.id,
+          action: isEdit ? 'UPDATE_QUESTION' : 'ADD_QUESTION',
+          details: { questionId, marks: marksNum }
+        });
       }
 
       setIsAddModalOpen(false);
       setIsEditModalOpen(false);
       fetchQuestions();
     } catch (err: any) {
-      setFormError(err.message);
+      setFormError(err.message || 'Failed to save question');
     } finally {
       setSubmitting(false);
     }
@@ -218,18 +273,39 @@ export const QuestionBankPage: React.FC = () => {
     if (!deleteTarget) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/questions/${deleteTarget.question_id}?force=false`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || 'Failed to delete question');
+      const { count } = await supabase
+        .from('submitted_answers')
+        .select('id', { count: 'exact', head: true })
+        .eq('question_id', deleteTarget.question_id);
+
+      if (count && count > 0) {
+        // Student submissions already reference this question — deactivate
+        // rather than hard-delete, preserving historical records (SAFE-01).
+        const { error: deactivateError } = await supabase
+          .from('questions')
+          .update({ status: 'deactivated' })
+          .eq('id', deleteTarget.question_id);
+        if (deactivateError) throw deactivateError;
+      } else {
+        const { error: deleteError } = await supabase
+          .from('questions')
+          .delete()
+          .eq('id', deleteTarget.question_id);
+        if (deleteError) throw deleteError;
       }
+
+      if (user) {
+        await supabase.from('audit_logs').insert({
+          user_id: user.id,
+          action: 'DEACTIVATE_QUESTION',
+          details: { questionId: deleteTarget.question_id }
+        });
+      }
+
       setDeleteTarget(null);
       fetchQuestions();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to delete question');
     } finally {
       setSubmitting(false);
     }
@@ -330,10 +406,12 @@ export const QuestionBankPage: React.FC = () => {
                         <span style={{ fontFamily: 'var(--font-mono)' }}>{q.question_id}</span>
                         <span>•</span>
                         <span>{q.options?.length || 4} Options</span>
-                        {q.exam_id && (
+                        {(q.exam_count || 0) > 0 && (
                           <>
                             <span>•</span>
-                            <span style={{ color: 'var(--color-action)' }}>Assigned to Exam</span>
+                            <span style={{ color: 'var(--color-action)' }}>
+                              Assigned to {q.exam_count} exam{q.exam_count === 1 ? '' : 's'}
+                            </span>
                           </>
                         )}
                       </div>

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 import { Badge } from '../../components/common/Badge';
 import { Spinner } from '../../components/common/Spinner';
 import { StatTile } from '../../components/common/StatTile';
@@ -39,25 +40,95 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [liveAttempts, setLiveAttempts] = useState<LiveAttempt[]>([]);
   const [liveError, setLiveError] = useState<string | null>(null);
-  const tokenRef = useRef(token);
-  tokenRef.current = token;
 
   const fetchMetrics = async () => {
-    if (!token) return;
+    if (!user) return;
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/metrics', {
-        headers: { Authorization: `Bearer ${token}` }
+
+      const [
+        studentsCount, examsCount, activeExamsCount, questionsCount, submissionsCount,
+        recentSubmissionsRes, recentActivityRes, examsForPerf, resultsForPerf
+      ] = await Promise.all([
+        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'student'),
+        supabase.from('examinations').select('id', { count: 'exact', head: true }),
+        supabase.from('examinations').select('id', { count: 'exact', head: true }).in('status', ['live', 'scheduled']),
+        supabase.from('questions').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('results').select('id', { count: 'exact', head: true }),
+        supabase
+          .from('results')
+          .select('result_id:id, marks_obtained, total_marks, percentage, status, evaluated_at, exam_id, profiles(name, roll_number), examinations(title)')
+          .order('evaluated_at', { ascending: false })
+          .limit(6),
+        supabase
+          .from('audit_logs')
+          .select('log_id:id, action, details, created_at, profiles(name)')
+          .order('created_at', { ascending: false })
+          .limit(8),
+        supabase
+          .from('examinations')
+          .select('exam_id:id, title, total_marks, results_released')
+          .neq('status', 'draft'),
+        supabase.from('results').select('exam_id, percentage, status')
+      ]);
+
+      const recentSubmissions = (recentSubmissionsRes.data || []).map((r: any) => ({
+        result_id: r.result_id,
+        marks_obtained: r.marks_obtained,
+        total_marks: r.total_marks,
+        percentage: r.percentage,
+        status: r.status,
+        evaluated_at: r.evaluated_at,
+        student_name: r.profiles?.name,
+        roll_number: r.profiles?.roll_number,
+        exam_title: r.examinations?.title,
+        exam_id: r.exam_id
+      }));
+
+      const recentActivity = (recentActivityRes.data || []).map((l: any) => ({
+        log_id: l.log_id,
+        action: l.action,
+        details: typeof l.details === 'string' ? l.details : JSON.stringify(l.details),
+        created_at: l.created_at,
+        user_name: l.profiles?.name
+      }));
+
+      const examPerformance = (examsForPerf.data || []).map((ex: any) => {
+        const examResults = (resultsForPerf.data || []).filter((r: any) => r.exam_id === ex.exam_id);
+        const candidateCount = examResults.length;
+        const avgPercentage = candidateCount > 0
+          ? examResults.reduce((sum: number, r: any) => sum + r.percentage, 0) / candidateCount
+          : 0;
+        const passCount = examResults.filter((r: any) => r.status === 'pass').length;
+        return {
+          exam_id: ex.exam_id,
+          title: ex.title,
+          total_marks: ex.total_marks,
+          results_released: ex.results_released,
+          candidate_count: candidateCount,
+          avg_percentage: avgPercentage,
+          pass_count: passCount
+        };
       });
-      if (!res.ok) throw new Error('Failed to load administrative metrics');
-      const json = await res.json();
-      setData(json);
+
+      setData({
+        metrics: {
+          totalStudents: studentsCount.count || 0,
+          totalExams: examsCount.count || 0,
+          activeExams: activeExamsCount.count || 0,
+          questionCount: questionsCount.count || 0,
+          totalSubmissions: submissionsCount.count || 0
+        },
+        recentSubmissions,
+        recentActivity,
+        examPerformance
+      });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -67,24 +138,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
 
   useEffect(() => {
     fetchMetrics();
-  }, [token]);
+  }, [user?.id]);
 
   // Live Exam Activity monitor — polls independently of the main metrics load
   // so it can refresh on its own cadence without re-triggering the full-page
   // spinner. Never blocks or is blocked by the rest of the dashboard.
   useEffect(() => {
-    if (!token) return;
+    if (!user) return;
     let cancelled = false;
 
     const fetchLiveAttempts = async () => {
       try {
-        const res = await fetch('/api/admin/live-attempts', {
-          headers: { Authorization: `Bearer ${tokenRef.current}` }
+        const { data: attempts, error: attemptsError } = await supabase
+          .from('exam_attempts')
+          .select('attempt_id:id, exam_id, start_time, profiles(name, roll_number), examinations(title, duration_minutes, exam_questions(count))')
+          .eq('status', 'in_progress')
+          .order('start_time', { ascending: true });
+
+        if (attemptsError) throw attemptsError;
+
+        const attemptIds = (attempts || []).map((a: any) => a.attempt_id);
+        let answeredByAttempt = new Map<string, number>();
+        if (attemptIds.length > 0) {
+          const { data: answers } = await supabase
+            .from('submitted_answers')
+            .select('attempt_id')
+            .in('attempt_id', attemptIds)
+            .not('selected_option_id', 'is', null);
+          for (const a of answers || []) {
+            answeredByAttempt.set(a.attempt_id, (answeredByAttempt.get(a.attempt_id) || 0) + 1);
+          }
+        }
+
+        const now = Date.now();
+        const mapped: LiveAttempt[] = (attempts || []).map((a: any) => {
+          const elapsedSeconds = Math.max(0, Math.floor((now - new Date(a.start_time).getTime()) / 1000));
+          const totalSeconds = (a.examinations?.duration_minutes || 0) * 60;
+          const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
+          return {
+            attemptId: a.attempt_id,
+            studentName: a.profiles?.name || 'Unknown',
+            rollNumber: a.profiles?.roll_number ?? null,
+            examTitle: a.examinations?.title || 'Unknown Exam',
+            examId: a.exam_id,
+            elapsedSeconds,
+            remainingSeconds,
+            answeredCount: answeredByAttempt.get(a.attempt_id) || 0,
+            totalQuestions: a.examinations?.exam_questions?.[0]?.count ?? 0
+          };
         });
-        if (!res.ok) throw new Error('Failed to load live exam activity');
-        const json = await res.json();
+
         if (!cancelled) {
-          setLiveAttempts(json.liveAttempts || []);
+          setLiveAttempts(mapped);
           setLiveError(null);
         }
       } catch (err: any) {
@@ -99,7 +204,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [token]);
+  }, [user?.id]);
 
   if (loading) {
     return <Spinner label="Loading administrative command center..." />;
@@ -314,8 +419,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                           </span>
                         </td>
                         <td>
-                          <Badge type={ex.results_released === 1 ? 'released' : 'scheduled'}>
-                            {ex.results_released === 1 ? 'Released' : 'Withheld'}
+                          <Badge type={ex.results_released ? 'released' : 'scheduled'}>
+                            {ex.results_released ? 'Released' : 'Withheld'}
                           </Badge>
                         </td>
                       </tr>

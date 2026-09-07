@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { supabase } from '../../lib/supabaseClient';
 import { AuditLog } from '../../types';
 import { Spinner } from '../../components/common/Spinner';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -16,8 +17,13 @@ import {
   HardDrive
 } from 'lucide-react';
 
+const BACKUP_TABLES = [
+  'profiles', 'examinations', 'questions', 'question_options', 'exam_questions',
+  'exam_attempts', 'submitted_answers', 'results', 'integrity_events', 'audit_logs'
+];
+
 export const SystemBackupPage: React.FC = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,16 +33,25 @@ export const SystemBackupPage: React.FC = () => {
 
   useEffect(() => {
     const fetchAuditLogs = async () => {
-      if (!token) return;
+      if (!user) return;
       try {
         setLoading(true);
-        const res = await fetch('/api/admin/audit-logs', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const d = await res.json();
-          setLogs(d.logs || []);
-        }
+        const { data, error } = await supabase
+          .from('audit_logs')
+          .select('log_id:id, action, details, created_at, profiles(name, role)')
+          .order('created_at', { ascending: false })
+          .limit(150);
+        if (error) throw error;
+
+        setLogs((data || []).map((l: any) => ({
+          log_id: l.log_id,
+          action: l.action,
+          details: typeof l.details === 'string' ? l.details : JSON.stringify(l.details),
+          created_at: l.created_at,
+          user_id: '',
+          user_name: l.profiles?.name,
+          user_role: l.profiles?.role
+        })));
       } catch (err) {
         console.error(err);
       } finally {
@@ -45,17 +60,26 @@ export const SystemBackupPage: React.FC = () => {
     };
 
     fetchAuditLogs();
-  }, [token]);
+  }, [user?.id]);
 
   const handleDownloadBackup = async () => {
-    if (!token) return;
+    if (!user) return;
     setDownloading(true);
     try {
-      const res = await fetch('/api/admin/backup', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Backup generation failed');
-      const blob = await res.blob();
+      const results = await Promise.all(
+        BACKUP_TABLES.map(table => supabase.from(table).select('*'))
+      );
+      const failed = results.find(r => r.error);
+      if (failed?.error) throw failed.error;
+
+      const backup = {
+        exportedAt: new Date().toISOString(),
+        version: '2.0-supabase',
+        institution: 'Adamas University',
+        data: Object.fromEntries(BACKUP_TABLES.map((table, i) => [table, results[i].data || []]))
+      };
+
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -64,8 +88,14 @@ export const SystemBackupPage: React.FC = () => {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+
+      await supabase.from('audit_logs').insert({
+        user_id: user.id,
+        action: 'SYSTEM_BACKUP',
+        details: { tables: BACKUP_TABLES }
+      });
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Backup generation failed');
     } finally {
       setDownloading(false);
     }

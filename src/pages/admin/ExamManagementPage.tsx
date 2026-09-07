@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { supabase } from '../../lib/supabaseClient';
 import { Examination, Question } from '../../types';
 import { Modal } from '../../components/common/Modal';
 import { Badge } from '../../components/common/Badge';
@@ -21,7 +22,7 @@ import {
 } from 'lucide-react';
 
 export const ExamManagementPage: React.FC = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
   const [exams, setExams] = useState<Examination[]>([]);
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
@@ -48,24 +49,30 @@ export const ExamManagementPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const fetchExams = async () => {
-    if (!token) return;
+    if (!user) return;
     try {
       setLoading(true);
-      const res = await fetch('/api/exams/admin', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Failed to load examinations');
-      const data = await res.json();
-      setExams(data.examinations || []);
+      const { data, error: queryError } = await supabase
+        .from('examinations')
+        .select(`
+          exam_id:id, title, description, duration_minutes, start_time, end_time,
+          total_marks, pass_percentage, negative_marks_per_question, status, results_released,
+          exam_questions(count)
+        `)
+        .order('created_at', { ascending: false });
+      if (queryError) throw queryError;
+
+      setExams((data || []).map((e: any) => ({
+        ...e,
+        question_count: e.exam_questions?.[0]?.count ?? 0
+      })));
 
       // Also fetch question bank for assignment
-      const qRes = await fetch('/api/questions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (qRes.ok) {
-        const qData = await qRes.json();
-        setAvailableQuestions(qData.questions || []);
-      }
+      const { data: qData, error: qError } = await supabase
+        .from('questions')
+        .select('question_id:id, question_text, marks, subject')
+        .order('created_at', { ascending: false });
+      if (!qError) setAvailableQuestions((qData || []) as Question[]);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -75,7 +82,7 @@ export const ExamManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchExams();
-  }, [token]);
+  }, [user?.id]);
 
   const openCreateModal = () => {
     setEditingExamId(null);
@@ -110,14 +117,11 @@ export const ExamManagementPage: React.FC = () => {
 
     // Fetch assigned question IDs
     try {
-      const res = await fetch(`/api/exams/admin/${exam.exam_id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const d = await res.json();
-        const assignedIds = (d.questions || []).map((q: any) => q.question_id);
-        setSelectedQuestionIds(assignedIds);
-      }
+      const { data } = await supabase
+        .from('exam_questions')
+        .select('question_id')
+        .eq('exam_id', exam.exam_id);
+      setSelectedQuestionIds((data || []).map((row: any) => row.question_id));
     } catch (err) {
       console.error(err);
     }
@@ -161,37 +165,82 @@ export const ExamManagementPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const url = editingExamId ? `/api/exams/${editingExamId}` : '/api/exams';
-      const method = editingExamId ? 'PUT' : 'POST';
+      const totalMarks = availableQuestions
+        .filter(q => selectedQuestionIds.includes(q.question_id))
+        .reduce((sum, q) => sum + q.marks, 0);
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          duration_minutes: duration,
-          start_time: new Date(startTime).toISOString(),
-          end_time: new Date(endTime).toISOString(),
-          pass_percentage: parseFloat(passPercentage),
-          negative_marks_per_question: parseFloat(negativeMarks),
-          status,
-          question_ids: selectedQuestionIds
-        })
-      });
+      let examId = editingExamId;
 
-      const d = await res.json();
-      if (!res.ok) {
-        throw new Error(d.error || 'Failed to save examination.');
+      if (examId) {
+        // REQ-23: schedule/questions are locked once candidates have attempted
+        const { count: attemptsCount } = await supabase
+          .from('exam_attempts')
+          .select('id', { count: 'exact', head: true })
+          .eq('exam_id', examId);
+
+        if (attemptsCount && attemptsCount > 0) {
+          throw new Error('Cannot modify the schedule or questions of an examination with active/submitted student attempts (REQ-23).');
+        }
+
+        const { error: updateError } = await supabase
+          .from('examinations')
+          .update({
+            title: title.trim(),
+            description: description.trim(),
+            duration_minutes: duration,
+            start_time: new Date(startTime).toISOString(),
+            end_time: new Date(endTime).toISOString(),
+            pass_percentage: parseFloat(passPercentage),
+            negative_marks_per_question: parseFloat(negativeMarks),
+            status,
+            total_marks: totalMarks
+          })
+          .eq('id', examId);
+        if (updateError) throw updateError;
+
+        const { error: clearError } = await supabase.from('exam_questions').delete().eq('exam_id', examId);
+        if (clearError) throw clearError;
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from('examinations')
+          .insert({
+            title: title.trim(),
+            description: description.trim(),
+            duration_minutes: duration,
+            start_time: new Date(startTime).toISOString(),
+            end_time: new Date(endTime).toISOString(),
+            pass_percentage: parseFloat(passPercentage),
+            negative_marks_per_question: parseFloat(negativeMarks),
+            status,
+            total_marks: totalMarks,
+            results_released: false,
+            created_by: user?.id
+          })
+          .select('id')
+          .single();
+        if (insertError) throw insertError;
+        examId = inserted.id;
+      }
+
+      if (selectedQuestionIds.length > 0) {
+        const { error: assignError } = await supabase
+          .from('exam_questions')
+          .insert(selectedQuestionIds.map(qId => ({ exam_id: examId, question_id: qId })));
+        if (assignError) throw assignError;
+      }
+
+      if (user) {
+        await supabase.from('audit_logs').insert({
+          user_id: user.id,
+          action: editingExamId ? 'UPDATE_EXAM' : 'CREATE_EXAM',
+          details: { examId, title: title.trim() }
+        });
       }
 
       setIsModalOpen(false);
       fetchExams();
     } catch (err: any) {
-      setFormError(err.message);
+      setFormError(err.message || 'Failed to save examination.');
     } finally {
       setSubmitting(false);
     }
@@ -199,22 +248,23 @@ export const ExamManagementPage: React.FC = () => {
 
   const handleToggleReleaseResults = async (examId: string, currentReleased: boolean) => {
     try {
-      const res = await fetch(`/api/exams/${examId}/release-results`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ release: !currentReleased })
-      });
-      if (res.ok) {
-        fetchExams();
-      } else {
-        const d = await res.json();
-        toast.error(d.error || 'Failed to toggle result release.');
+      const nextReleased = !currentReleased;
+      const { error: updateError } = await supabase
+        .from('examinations')
+        .update({ results_released: nextReleased, status: nextReleased ? 'released' : 'completed' })
+        .eq('id', examId);
+      if (updateError) throw updateError;
+
+      if (user) {
+        await supabase.from('audit_logs').insert({
+          user_id: user.id,
+          action: nextReleased ? 'RELEASE_RESULTS' : 'UNRELEASE_RESULTS',
+          details: { examId }
+        });
       }
+      fetchExams();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to toggle result release.');
     }
   };
 
@@ -222,18 +272,33 @@ export const ExamManagementPage: React.FC = () => {
     if (!deleteTarget) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/exams/${deleteTarget.exam_id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const d = await res.json();
-      if (!res.ok) {
-        throw new Error(d.error || 'Failed to delete examination');
+      const { count: attemptsCount } = await supabase
+        .from('exam_attempts')
+        .select('id', { count: 'exact', head: true })
+        .eq('exam_id', deleteTarget.exam_id);
+
+      if (attemptsCount && attemptsCount > 0) {
+        throw new Error('Cannot delete this examination because submitted student records exist. Mark it as completed instead.');
       }
+
+      const { error: deleteError } = await supabase
+        .from('examinations')
+        .delete()
+        .eq('id', deleteTarget.exam_id);
+      if (deleteError) throw deleteError;
+
+      if (user) {
+        await supabase.from('audit_logs').insert({
+          user_id: user.id,
+          action: 'DELETE_EXAM',
+          details: { examId: deleteTarget.exam_id, title: deleteTarget.title }
+        });
+      }
+
       setDeleteTarget(null);
       fetchExams();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Failed to delete examination');
     } finally {
       setSubmitting(false);
     }
@@ -272,7 +337,7 @@ export const ExamManagementPage: React.FC = () => {
               </thead>
               <tbody>
                 {exams.map(exam => {
-                  const isReleased = exam.results_released === 1;
+                  const isReleased = exam.results_released;
                   return (
                     <tr key={exam.exam_id}>
                       <td style={{ maxWidth: '320px' }}>
