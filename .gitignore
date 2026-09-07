@@ -9,3 +9,6 @@ data/*.db-wal
 # Supabase CLI local artifacts (if you use `supabase start` locally)
 supabase/.temp/
 supabase/.branches/
+
+# Local Claude Code session state
+.claude/

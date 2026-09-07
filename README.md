@@ -22,7 +22,7 @@ The application runs in one of two modes:
   answers from students) lives in **Postgres RPC functions**
   (`supabase/migrations/0003_functions.sql`), not a separate API server.
 - **The one exception**: creating/deleting a user account needs Supabase's
-  service_role key, which must never reach the browser. That one operation
+  secret key, which must never reach the browser. That one operation
   is a small Vercel serverless function, [api/admin-users.js](api/admin-users.js).
 - **Deployment**: a static SPA + one serverless function. No backend process
   to keep alive, no port to conflict with.
@@ -82,7 +82,7 @@ Go to [supabase.com](https://supabase.com), create a project, and open
 **Settings → API**. You'll need:
 - **Project URL**
 - **anon / public key**
-- **service_role key** (keep this one secret — server-only)
+- **secret key** (keep this one secret — server-only)
 
 ### 3. Run the database migrations
 Open your project's **SQL Editor** in the Supabase dashboard and run these
@@ -106,9 +106,9 @@ cp .env.example .env
 Fill in:
 ```
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_SUPABASE_PUBLISHABLE_KEY=eyJ...
 SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJ...          # server-only — see below
+SUPABASE_SECRET_KEY=eyJ...          # server-only — see below
 ```
 
 ### 5. Create demo accounts and sample data
@@ -117,7 +117,7 @@ npm run supabase:seed
 ```
 This creates one admin account, two student accounts, a live exam with
 questions, and a second exam with an already-graded result — using the
-Supabase **Admin API** with your `SUPABASE_SERVICE_ROLE_KEY`. The script
+Supabase **Admin API** with your `SUPABASE_SECRET_KEY`. The script
 runs locally on your machine only; the key is never sent anywhere else and
 never appears in any file that gets committed or shipped to the browser.
 It prints the exact demo credentials it created when it finishes, and it's
@@ -156,9 +156,11 @@ demo credentials.
 | Variable | Used by | Required for |
 |---|---|---|
 | `VITE_SUPABASE_URL` | Frontend | Supabase mode |
-| `VITE_SUPABASE_ANON_KEY` | Frontend | Supabase mode |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Frontend | Supabase mode |
 | `SUPABASE_URL` | `api/admin-users.js`, `scripts/supabase-seed.mjs` | Admin user management, seeding |
-| `SUPABASE_SERVICE_ROLE_KEY` | `api/admin-users.js`, `scripts/supabase-seed.mjs` | Admin user management, seeding |
+| `SUPABASE_SECRET_KEY` | `api/admin-users.js`, `scripts/supabase-seed.mjs` | Admin user management, seeding |
+| `SUPABASE_DB_PASSWORD` | `supabase` CLI only | Optional — only if pushing migrations via the CLI (`supabase db push`) |
+| `SUPABASE_ACCESS_TOKEN` | `supabase` CLI only | Optional — a Personal Access Token, alternative migration path over HTTPS when the CLI's direct Postgres connection isn't reachable (e.g. sandboxed/CI networks that only permit HTTPS egress). Generate one at your [Supabase account tokens page](https://supabase.com/dashboard/account/tokens) and use it with `supabase login --token` or the Management API directly |
 | `JWT_SECRET` | Legacy `server/` | Legacy mode only |
 | `PORT` | Legacy `server/` | Legacy mode only (default 5050) |
 
@@ -242,5 +244,5 @@ server process for Vercel to keep warm.
 - No secrets, database files, or credentials are committed. The only
   credentials anywhere in this repo are clearly-labeled **local demo**
   values in seed scripts, never real ones.
-- `SUPABASE_SERVICE_ROLE_KEY` exists only in your local `.env` and in
+- `SUPABASE_SECRET_KEY` exists only in your local `.env` and in
   Vercel's environment variable settings — never in source.

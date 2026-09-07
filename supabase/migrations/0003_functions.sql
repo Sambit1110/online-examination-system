@@ -259,8 +259,9 @@ declare
   v_total_questions integer := 0;
   v_percentage numeric;
   v_status text;
-  v_result record;
-  v_existing_result record;
+  v_grade_row record;
+  v_result_row results%rowtype;
+  v_existing_result results%rowtype;
 begin
   if v_uid is null then
     raise exception 'Authentication required.';
@@ -290,7 +291,7 @@ begin
 
   -- Grade: for each active question assigned to this exam, compare the
   -- student's selected option against the option flagged is_correct.
-  for v_result in
+  for v_grade_row in
     select
       q.id as question_id,
       q.marks as marks,
@@ -304,12 +305,12 @@ begin
     where eq.exam_id = v_attempt.exam_id
   loop
     v_total_questions := v_total_questions + 1;
-    v_total_marks := v_total_marks + v_result.marks;
+    v_total_marks := v_total_marks + v_grade_row.marks;
 
-    if v_result.selected_option_id is null then
+    if v_grade_row.selected_option_id is null then
       v_unanswered_count := v_unanswered_count + 1;
-    elsif v_result.selected_option_id = v_result.correct_option_id then
-      v_marks_obtained := v_marks_obtained + v_result.marks;
+    elsif v_grade_row.selected_option_id = v_grade_row.correct_option_id then
+      v_marks_obtained := v_marks_obtained + v_grade_row.marks;
       v_correct_count := v_correct_count + 1;
     else
       v_incorrect_count := v_incorrect_count + 1;
@@ -340,7 +341,7 @@ begin
     incorrect_count = excluded.incorrect_count,
     unanswered_count = excluded.unanswered_count,
     evaluated_at = now()
-  returning * into v_result;
+  returning * into v_result_row;
 
   update exam_attempts set evaluated_at = now() where id = p_attempt_id;
 
@@ -357,7 +358,7 @@ begin
     'status', v_final_status,
     'attemptId', p_attempt_id,
     'resultsReleased', coalesce(v_exam.results_released, false),
-    'result', public.result_to_jsonb(v_result)
+    'result', public.result_to_jsonb(v_result_row)
   );
 end;
 $$;
@@ -377,7 +378,7 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_exam record;
-  v_result record;
+  v_result results%rowtype;
   v_is_released boolean;
   v_review jsonb := null;
 begin

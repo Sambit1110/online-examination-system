@@ -5,17 +5,17 @@
 // Required server-only environment variables (set in the Vercel project,
 // NOT prefixed with VITE_ so they are never bundled into client code):
 //   SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY
+//   SUPABASE_SECRET_KEY
 
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
 
 export default async function handler(req, res) {
   if (!supabaseUrl || !serviceRoleKey) {
     return res.status(500).json({
-      error: 'Server misconfiguration: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not set.'
+      error: 'Server misconfiguration: SUPABASE_URL / SUPABASE_SECRET_KEY are not set.'
     });
   }
 

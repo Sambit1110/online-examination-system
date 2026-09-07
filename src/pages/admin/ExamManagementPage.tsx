@@ -21,6 +21,16 @@ import {
   Eye
 } from 'lucide-react';
 
+// datetime-local inputs expect wall-clock time with no timezone info, but
+// Date.toISOString() always prints UTC — converting a Date straight through
+// silently swaps in the UTC clock reading wherever the browser isn't in
+// UTC, shifting the exam window by the local offset. Subtract the offset
+// first so the printed digits match what the browser's clock actually shows.
+const toLocalInputValue = (date: Date): string => {
+  const offsetMs = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+};
+
 export const ExamManagementPage: React.FC = () => {
   const { user } = useAuth();
   const toast = useToast();
@@ -93,8 +103,8 @@ export const ExamManagementPage: React.FC = () => {
     // Default dates: start now, end in 4 hours
     const now = new Date();
     const fourHoursLater = new Date(now.getTime() + 4 * 60 * 60 * 1000);
-    setStartTime(now.toISOString().slice(0, 16));
-    setEndTime(fourHoursLater.toISOString().slice(0, 16));
+    setStartTime(toLocalInputValue(now));
+    setEndTime(toLocalInputValue(fourHoursLater));
 
     setPassPercentage('40.0');
     setNegativeMarks('0.0');
@@ -109,8 +119,8 @@ export const ExamManagementPage: React.FC = () => {
     setTitle(exam.title);
     setDescription(exam.description || '');
     setDurationMinutes(String(exam.duration_minutes));
-    setStartTime(exam.start_time ? exam.start_time.slice(0, 16) : '');
-    setEndTime(exam.end_time ? exam.end_time.slice(0, 16) : '');
+    setStartTime(exam.start_time ? toLocalInputValue(new Date(exam.start_time)) : '');
+    setEndTime(exam.end_time ? toLocalInputValue(new Date(exam.end_time)) : '');
     setPassPercentage(String(exam.pass_percentage || 40.0));
     setNegativeMarks(String(exam.negative_marks_per_question || 0.0));
     setStatus(exam.status);

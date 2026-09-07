@@ -8,7 +8,7 @@
 // attempt so the results/review UI has real data to show immediately.
 //
 // Usage:
-//   1. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your local .env
+//   1. Set SUPABASE_URL and SUPABASE_SECRET_KEY in your local .env
 //      (find both in your Supabase project's Settings -> API page).
 //   2. Run the schema/RLS/function migrations first (see README.md).
 //   3. node scripts/supabase-seed.mjs
@@ -20,10 +20,10 @@ import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_KEY;
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  console.error('Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY in your environment (.env).');
+  console.error('Missing SUPABASE_URL / SUPABASE_SECRET_KEY in your environment (.env).');
   console.error('These are project-admin credentials — do NOT reuse the anon key here, and never commit them.');
   process.exit(1);
 }
