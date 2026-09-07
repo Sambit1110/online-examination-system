@@ -15,7 +15,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+// Default 5050 (not 5000) — macOS Control Center's AirPlay Receiver binds
+// port 5000 on many Macs by default, which silently breaks local dev if this
+// server can't claim it. Override with the PORT env var if 5050 also conflicts.
+const PORT = process.env.PORT || 5050;
 
 // Middleware
 app.use(cors());

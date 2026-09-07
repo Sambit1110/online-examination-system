@@ -25,11 +25,15 @@ Start the fullstack server (Express + SQLite backend + built static frontend):
 node server/index.js
 ```
 The application will be live at:
-**[http://localhost:5000](http://localhost:5000)**
+**[http://localhost:5050](http://localhost:5050)**
+
+(Default port is 5050, not 5000 — macOS Control Center's AirPlay Receiver
+binds port 5000 on many Macs by default, which otherwise silently breaks
+local dev. Override with `PORT=xxxx` if 5050 also conflicts on your machine.)
 
 ### 4. Frontend Development Server (Optional)
 To run the Vite hot-reloading dev server (serves the UI at `http://localhost:5173`
-and proxies `/api` requests to the Express backend on port 5000):
+and proxies `/api` requests to the Express backend on port 5050):
 ```bash
 npm run dev
 ```

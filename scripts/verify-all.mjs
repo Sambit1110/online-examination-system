@@ -1,7 +1,7 @@
 // Automated End-to-End Verification Suite for Adamas University OES
 // Tests all 50 SRS Requirements, Security Rules, Business Rules, and Performance
 
-const BASE_URL = 'http://localhost:5000/api';
+const BASE_URL = 'http://localhost:5050/api';
 
 async function testSuite() {
   console.log('====================================================');
