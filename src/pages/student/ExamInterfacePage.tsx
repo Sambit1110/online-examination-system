@@ -367,14 +367,15 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({
           </div>
 
           {/* Compact Countdown Clock (JetBrains Mono) */}
-          <div style={{
+          <div className={isTimeCritical ? 'timer-critical-pulse' : undefined} style={{
             display: 'flex',
             alignItems: 'center',
             gap: '0.45rem',
             backgroundColor: isTimeCritical ? 'var(--color-danger-bg)' : (isTimeWarning ? 'var(--color-warning-bg)' : 'var(--bg-surface-secondary)'),
             padding: '0.35rem 0.75rem',
-            borderRadius: 'var(--radius-xs)',
-            border: `1px solid ${isTimeCritical ? 'var(--color-danger-border)' : (isTimeWarning ? 'var(--color-warning-border)' : 'var(--border-subtle)')}`
+            borderRadius: 'var(--radius-sm)',
+            border: `1px solid ${isTimeCritical ? 'var(--color-danger-border)' : (isTimeWarning ? 'var(--color-warning-border)' : 'var(--border-subtle)')}`,
+            transition: 'background-color var(--duration-base) ease, border-color var(--duration-base) ease'
           }}>
             <Clock size={14} color={isTimeCritical ? 'var(--color-danger)' : (isTimeWarning ? 'var(--color-warning)' : 'var(--text-secondary)')} />
             <div>

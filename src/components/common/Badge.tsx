@@ -16,7 +16,7 @@ export const Badge: React.FC<BadgeProps> = ({ type, children }) => {
         color: '#15803d',
         border: '1px solid #bbf7d0'
       };
-      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block' }} />;
+      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#16a34a', color: '#16a34a', display: 'inline-block', animation: 'badgeDotRing 1.8s ease-in-out infinite' }} />;
       break;
     case 'scheduled':
       style = {
@@ -68,7 +68,7 @@ export const Badge: React.FC<BadgeProps> = ({ type, children }) => {
         color: '#1d4ed8',
         border: '1px solid #bfdbfe'
       };
-      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#2563eb', display: 'inline-block' }} />;
+      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#2563eb', color: '#2563eb', display: 'inline-block', animation: 'badgeDotRing 1.8s ease-in-out infinite' }} />;
       break;
   }
 

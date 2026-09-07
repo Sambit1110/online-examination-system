@@ -28,6 +28,14 @@ interface NavItem {
 export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) => {
   const { user, logout, isAdmin, isStudent } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  React.useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   if (!user) return null;
 
@@ -101,8 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
   };
 
   return (
-    <header style={{
-      backgroundColor: 'var(--bg-surface)',
+    <header className={`navbar-glass${scrolled ? ' is-scrolled' : ''}`} style={{
       borderBottom: '1px solid var(--border-subtle)',
       position: 'sticky',
       top: 0,
@@ -121,6 +128,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
       }}>
         {/* Brand Identity */}
         <div
+          className="nav-brand"
           onClick={() => handleNavigate(isAdmin ? 'admin-dashboard' : 'student-dashboard')}
           style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}
         >
@@ -132,7 +140,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ffffff'
+            color: '#ffffff',
+            boxShadow: '0 2px 6px rgba(15, 23, 42, 0.25)'
           }}>
             <GraduationCap size={15} />
           </div>
@@ -172,11 +181,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
             return (
               <button
                 key={item.view}
+                className="nav-item"
                 onClick={() => handleNavigate(item.view)}
                 data-active={active}
                 style={{
                   height: '100%',
                   border: 'none',
+                  background: 'transparent',
                   borderBottom: active ? '2px solid var(--color-action)' : '2px solid transparent',
                   color: active ? 'var(--text-main)' : 'var(--text-secondary)',
                   padding: '0 0.65rem',
@@ -186,7 +197,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.35rem',
-                  transition: 'color 0.12s ease'
+                  transition: 'color var(--duration-fast) ease, background-color var(--duration-fast) ease'
                 }}
               >
                 {item.icon} {item.label}

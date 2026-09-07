@@ -46,7 +46,7 @@ export const LoginPage: React.FC = () => {
         }}>
           {/* Institution Header */}
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{
+            <div className="auth-icon-badge" style={{
               width: '3rem',
               height: '3rem',
               borderRadius: 'var(--radius-lg)',
@@ -56,7 +56,7 @@ export const LoginPage: React.FC = () => {
               justifyContent: 'center',
               color: '#ffffff',
               marginBottom: '1.1rem',
-              boxShadow: 'var(--shadow-md)'
+              boxShadow: 'var(--shadow-glow-brand)'
             }}>
               <GraduationCap size={22} />
             </div>
@@ -69,7 +69,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Form Card */}
-          <div className="card animate-slide-up stagger-1" style={{ padding: '2rem', boxShadow: 'var(--shadow-md)', borderRadius: 'var(--radius-lg)' }}>
+          <div className="card animate-slide-up stagger-1" style={{ padding: '2rem', boxShadow: 'var(--shadow-lg)', borderRadius: 'var(--radius-lg)' }}>
             {/* Minimal Segmented Switcher */}
             <div style={{
               display: 'flex',
@@ -93,7 +93,7 @@ export const LoginPage: React.FC = () => {
                   backgroundColor: roleTab === 'student' ? 'var(--bg-surface)' : 'transparent',
                   color: roleTab === 'student' ? 'var(--text-main)' : 'var(--text-secondary)',
                   boxShadow: roleTab === 'student' ? 'var(--shadow-xs)' : 'none',
-                  transition: 'background-color 0.12s ease'
+                  transition: 'background-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) ease, transform var(--duration-fast) ease'
                 }}
               >
                 Student
@@ -112,7 +112,7 @@ export const LoginPage: React.FC = () => {
                   backgroundColor: roleTab === 'admin' ? 'var(--bg-surface)' : 'transparent',
                   color: roleTab === 'admin' ? 'var(--text-main)' : 'var(--text-secondary)',
                   boxShadow: roleTab === 'admin' ? 'var(--shadow-xs)' : 'none',
-                  transition: 'background-color 0.12s ease'
+                  transition: 'background-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) ease, transform var(--duration-fast) ease'
                 }}
               >
                 Administrator
