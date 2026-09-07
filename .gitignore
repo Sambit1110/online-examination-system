@@ -12,3 +12,5 @@ supabase/.branches/
 
 # Local Claude Code session state
 .claude/
+.vercel
+.env*
