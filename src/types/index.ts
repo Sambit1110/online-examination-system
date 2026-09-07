@@ -66,6 +66,19 @@ export interface ExamAttempt {
   submitted_at?: string;
 }
 
+// Live admin monitoring — GET /api/admin/live-attempts
+export interface LiveAttempt {
+  attemptId: string;
+  studentName: string;
+  rollNumber: string | null;
+  examTitle: string;
+  examId: string;
+  elapsedSeconds: number;
+  remainingSeconds: number;
+  answeredCount: number;
+  totalQuestions: number;
+}
+
 export interface Result {
   result_id: string;
   attempt_id: string;

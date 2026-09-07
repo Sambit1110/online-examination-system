@@ -60,6 +60,43 @@ router.get('/metrics', (req, res) => {
   });
 });
 
+// GET /api/admin/live-attempts - Real-time roster of exams currently in progress
+router.get('/live-attempts', (req, res) => {
+  const rows = queryAll(`
+    SELECT a.attempt_id, a.user_id, a.exam_id, a.start_time,
+           u.name as student_name, u.roll_number,
+           e.title as exam_title, e.duration_minutes,
+           (SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.exam_id AND q.status = 'active') as total_questions,
+           (SELECT COUNT(*) FROM answers ans WHERE ans.attempt_id = a.attempt_id AND ans.selected_option_id IS NOT NULL) as answered_count
+    FROM exam_attempts a
+    JOIN users u ON a.user_id = u.user_id
+    JOIN examinations e ON a.exam_id = e.exam_id
+    WHERE a.status = 'in_progress'
+    ORDER BY a.start_time ASC
+  `);
+
+  const now = Date.now();
+  const liveAttempts = rows.map(row => {
+    const startMs = new Date(row.start_time).getTime();
+    const elapsedSeconds = Math.max(0, Math.floor((now - startMs) / 1000));
+    const totalSeconds = row.duration_minutes * 60;
+    const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
+    return {
+      attemptId: row.attempt_id,
+      studentName: row.student_name,
+      rollNumber: row.roll_number,
+      examTitle: row.exam_title,
+      examId: row.exam_id,
+      elapsedSeconds,
+      remainingSeconds,
+      answeredCount: row.answered_count,
+      totalQuestions: row.total_questions
+    };
+  });
+
+  return res.json({ liveAttempts });
+});
+
 // GET /api/admin/users - User management
 router.get('/users', (req, res) => {
   const users = queryAll(`

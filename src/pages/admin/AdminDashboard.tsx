@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../../components/common/Badge';
 import { Spinner } from '../../components/common/Spinner';
 import { StatTile } from '../../components/common/StatTile';
 import { EmptyState } from '../../components/common/EmptyState';
+import { LiveAttempt } from '../../types';
 import {
   Users,
   FileText,
@@ -17,8 +18,21 @@ import {
   CheckCircle2,
   Download,
   Activity,
-  ShieldCheck
+  ShieldCheck,
+  Radio,
+  Monitor
 } from 'lucide-react';
+
+// How often the live monitor re-polls the server. Frequent enough to feel
+// "live" in a demo, gentle enough to not hammer the API for a handful of
+// concurrent candidates.
+const LIVE_POLL_INTERVAL_MS = 8000;
+
+const formatDuration = (totalSeconds: number): string => {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
 
 interface AdminDashboardProps {
   onNavigate: (view: string) => void;
@@ -29,6 +43,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [liveAttempts, setLiveAttempts] = useState<LiveAttempt[]>([]);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
 
   const fetchMetrics = async () => {
     if (!token) return;
@@ -49,6 +67,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
 
   useEffect(() => {
     fetchMetrics();
+  }, [token]);
+
+  // Live Exam Activity monitor — polls independently of the main metrics load
+  // so it can refresh on its own cadence without re-triggering the full-page
+  // spinner. Never blocks or is blocked by the rest of the dashboard.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    const fetchLiveAttempts = async () => {
+      try {
+        const res = await fetch('/api/admin/live-attempts', {
+          headers: { Authorization: `Bearer ${tokenRef.current}` }
+        });
+        if (!res.ok) throw new Error('Failed to load live exam activity');
+        const json = await res.json();
+        if (!cancelled) {
+          setLiveAttempts(json.liveAttempts || []);
+          setLiveError(null);
+        }
+      } catch (err: any) {
+        if (!cancelled) setLiveError(err.message);
+      }
+    };
+
+    fetchLiveAttempts();
+    const intervalId = setInterval(fetchLiveAttempts, LIVE_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
   }, [token]);
 
   if (loading) {
@@ -131,6 +181,92 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
           meta="Evaluated attempts"
           icon={<Award size={16} />}
         />
+      </div>
+
+      {/* Live Exam Activity Monitor — real-time roster of in-progress attempts */}
+      <div className="card animate-slide-up" style={{ padding: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Radio size={16} color="var(--color-action)" />
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-brand-primary)' }}>
+              Live Exam Activity
+            </h2>
+            {liveAttempts.length > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span className="pulse-dot-live" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: 'var(--color-success)', display: 'inline-block' }} />
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-success)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Live
+                </span>
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {liveAttempts.length} candidate{liveAttempts.length === 1 ? '' : 's'} in an active session • refreshes every {LIVE_POLL_INTERVAL_MS / 1000}s
+          </span>
+        </div>
+
+        {liveError ? (
+          <div className="error-banner">{liveError}</div>
+        ) : liveAttempts.length === 0 ? (
+          <EmptyState
+            icon={<Monitor size={30} strokeWidth={1.5} />}
+            title="No candidates are currently taking an examination."
+            description="This panel updates automatically the moment a student starts a live exam."
+          />
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="academic-table">
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Examination</th>
+                  <th>Progress</th>
+                  <th>Elapsed</th>
+                  <th>Remaining</th>
+                </tr>
+              </thead>
+              <tbody>
+                {liveAttempts.map(a => {
+                  const progressPct = a.totalQuestions > 0 ? Math.round((a.answeredCount / a.totalQuestions) * 100) : 0;
+                  const isCritical = a.remainingSeconds < 60;
+                  const isWarning = a.remainingSeconds < 300;
+                  return (
+                    <tr key={a.attemptId}>
+                      <td>
+                        <div style={{ fontWeight: 700, color: 'var(--color-brand-primary)' }}>{a.studentName}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{a.rollNumber || '—'}</div>
+                      </td>
+                      <td style={{ fontSize: '0.8125rem' }}>{a.examTitle}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '140px' }}>
+                          <div className="progress-track" style={{ flex: 1 }}>
+                            <div className="progress-fill" style={{ width: `${progressPct}%`, backgroundColor: 'var(--color-success)' }} />
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                            {a.answeredCount}/{a.totalQuestions}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                        {formatDuration(a.elapsedSeconds)}
+                      </td>
+                      <td>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '0.8125rem',
+                          fontWeight: 600,
+                          color: isCritical ? 'var(--color-danger)' : (isWarning ? 'var(--color-warning)' : 'var(--text-main)')
+                        }}>
+                          {formatDuration(a.remainingSeconds)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Main Operations Grid */}
