@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
   GraduationCap,
@@ -30,12 +30,23 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 4);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Escape closes the mobile menu, matching the dialog convention used
+  // everywhere else in the app.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileOpen]);
 
   if (!user) return null;
 
@@ -43,13 +54,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
     {
       view: 'student-dashboard',
       label: 'Dashboard',
-      icon: <LayoutDashboard size={14} />,
+      icon: <LayoutDashboard size={14} aria-hidden="true" />,
       isActive: v => v === 'default' || v === 'student-dashboard'
     },
     {
       view: 'student-results',
       label: 'Results',
-      icon: <Award size={14} />,
+      icon: <Award size={14} aria-hidden="true" />,
       isActive: v => v === 'student-results'
     }
   ];
@@ -58,42 +69,42 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
     {
       view: 'admin-dashboard',
       label: 'Overview',
-      icon: <LayoutDashboard size={14} />,
+      icon: <LayoutDashboard size={14} aria-hidden="true" />,
       isActive: v => v === 'default' || v === 'admin-dashboard'
     },
     {
       view: 'admin-questions',
       label: 'Questions',
-      icon: <FileQuestion size={14} />,
+      icon: <FileQuestion size={14} aria-hidden="true" />,
       isActive: v => v === 'admin-questions'
     },
     {
       view: 'admin-exams',
       label: 'Exams',
-      icon: <CalendarDays size={14} />,
+      icon: <CalendarDays size={14} aria-hidden="true" />,
       isActive: v => v === 'admin-exams'
     },
     {
       view: 'admin-results',
-      label: 'Grades',
-      icon: <Award size={14} />,
+      label: 'Gradebook',
+      icon: <Award size={14} aria-hidden="true" />,
       isActive: v => v === 'admin-results'
     },
     {
       view: 'admin-users',
       label: 'Users',
-      icon: <Users size={14} />,
+      icon: <Users size={14} aria-hidden="true" />,
       isActive: v => v === 'admin-users'
     },
     {
       view: 'admin-backup',
-      label: 'Maintenance',
-      icon: <DatabaseBackup size={14} />,
+      label: 'Backup',
+      icon: <DatabaseBackup size={14} aria-hidden="true" />,
       isActive: v => v === 'admin-backup'
     }
   ];
 
-  const items = isStudent ? studentItems : (isAdmin ? adminItems : []);
+  const items = isStudent ? studentItems : isAdmin ? adminItems : [];
 
   const initials = user.name
     .split(' ')
@@ -109,96 +120,44 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
   };
 
   return (
-    <header className={`navbar-glass${scrolled ? ' is-scrolled' : ''}`} style={{
-      borderBottom: '1px solid var(--border-subtle)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 100
-    }}>
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '0 1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        minHeight: '54px',
-        gap: '1rem'
-      }}>
-        {/* Brand Identity */}
-        <div
+    <header className={`navbar-glass${scrolled ? ' is-scrolled' : ''}`}>
+      <div className="navbar-inner">
+        <button
+          type="button"
           className="nav-brand"
           onClick={() => handleNavigate(isAdmin ? 'admin-dashboard' : 'student-dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}
         >
-          <div style={{
-            width: '1.75rem',
-            height: '1.75rem',
-            borderRadius: 'var(--radius-xs)',
-            backgroundColor: 'var(--color-action)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#ffffff',
-            boxShadow: '0 2px 6px rgba(15, 23, 42, 0.25)'
-          }}>
+          <span className="nav-brand__mark" aria-hidden="true">
             <GraduationCap size={15} />
-          </div>
-          <div>
-            <div style={{
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: 'var(--text-main)',
-              lineHeight: 1.2
-            }}>
-              Adamas University
-            </div>
-            <div style={{
-              fontSize: '0.6875rem',
-              color: 'var(--text-muted)',
-              lineHeight: 1.1
-            }}>
-              Online Examination Portal
-            </div>
-          </div>
-        </div>
+          </span>
+          <span className="nav-brand__text">
+            <span className="nav-brand__name">Adamas University</span>
+            <span className="nav-brand__sub">Online Examination System</span>
+          </span>
+        </button>
 
-        {/* Mobile menu toggle */}
         <button
+          type="button"
           className="nav-toggle"
           onClick={() => setMobileOpen(prev => !prev)}
           aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
           aria-expanded={mobileOpen}
+          aria-controls="primary-navigation"
         >
-          {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+          {mobileOpen ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
         </button>
 
-        {/* Navigation Links */}
-        <nav className="nav-links" data-closed={!mobileOpen}>
+        <nav className="nav-links" id="primary-navigation" data-closed={!mobileOpen} aria-label="Primary">
           {items.map(item => {
             const active = item.isActive(currentView);
             return (
               <button
                 key={item.view}
+                type="button"
                 className="nav-item"
                 onClick={() => handleNavigate(item.view)}
                 data-active={active}
-                style={{
-                  height: '100%',
-                  border: 'none',
-                  background: 'transparent',
-                  borderBottom: active ? '2px solid var(--color-action)' : '2px solid transparent',
-                  color: active ? 'var(--text-main)' : 'var(--text-secondary)',
-                  padding: '0 0.65rem',
-                  fontSize: '0.8125rem',
-                  fontWeight: active ? 600 : 500,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  transition: 'color var(--duration-fast) ease, background-color var(--duration-fast) ease'
-                }}
+                aria-current={active ? 'page' : undefined}
               >
                 {item.icon} {item.label}
               </button>
@@ -206,24 +165,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
           })}
         </nav>
 
-        {/* User Status & Sign Out */}
         <div className="nav-user">
-          <div className="nav-avatar" title={user.name}>{initials || 'U'}</div>
-          <div className="nav-user-info" style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-main)' }}>
-              {user.name}
-            </div>
-            <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-              {user.role === 'admin' ? 'Administrator' : (user.rollNumber || 'Student')}
+          <span className="nav-avatar" aria-hidden="true">
+            {initials || 'U'}
+          </span>
+          <div className="nav-user-info">
+            <div className="nav-user-info__name">{user.name}</div>
+            <div className="nav-user-info__meta">
+              {user.role === 'admin' ? 'Administrator' : user.rollNumber || 'Student'}
             </div>
           </div>
 
-          <button
-            onClick={logout}
-            className="btn btn-secondary btn-sm"
-            title="Sign out of portal"
-          >
-            <LogOut size={13} />
+          <button onClick={logout} className="btn btn-secondary btn-sm" type="button">
+            <LogOut size={13} aria-hidden="true" />
             <span>Sign out</span>
           </button>
         </div>

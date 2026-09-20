@@ -1,12 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { User } from '../types';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
+  /**
+   * Set when Supabase Auth accepted the session but the matching `profiles`
+   * row could not be read. Without this the app silently renders the login
+   * screen for an already-signed-in user, who then logs in again into the
+   * same dead end.
+   */
+  profileError: string | null;
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isAdmin: boolean;
@@ -15,7 +22,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const loadProfile = async (session: Session): Promise<User | null> => {
+type ProfileLoad = { user: User; error: null } | { user: null; error: string };
+
+const loadProfile = async (session: Session): Promise<ProfileLoad> => {
   const { data, error } = await supabase
     .from('profiles')
     .select('id, name, role, roll_number, department')
@@ -24,16 +33,23 @@ const loadProfile = async (session: Session): Promise<User | null> => {
 
   if (error || !data) {
     console.error('Failed to load user profile:', error);
-    return null;
+    return {
+      user: null,
+      error:
+        'Your account is signed in, but its portal profile could not be loaded. Please contact the Examination Cell so your record can be verified.'
+    };
   }
 
   return {
-    id: data.id,
-    name: data.name,
-    email: session.user.email || '',
-    role: data.role,
-    rollNumber: data.roll_number,
-    department: data.department
+    user: {
+      id: data.id,
+      name: data.name,
+      email: session.user.email || '',
+      role: data.role,
+      rollNumber: data.roll_number,
+      department: data.department
+    },
+    error: null
   };
 };
 
@@ -41,34 +57,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Without credentials every call would fail against a placeholder host;
+    // App renders the configuration screen instead.
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
+
+    const applySession = async (session: Session) => {
+      const { user: profile, error } = await loadProfile(session);
+      if (!mounted) return;
+      setUser(profile);
+      setProfileError(error);
+      setToken(session.access_token);
+    };
 
     // Restore any existing session on first load (page refresh, new tab, etc.)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
-      if (session) {
-        const profile = await loadProfile(session);
-        if (!mounted) return;
-        setUser(profile);
-        setToken(session.access_token);
-      }
+      if (session) await applySession(session);
+      if (!mounted) return;
       setLoading(false);
     });
 
     // Keep the session in sync across tabs, token refreshes, and sign-outs.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-      if (session) {
-        const profile = await loadProfile(session);
-        if (!mounted) return;
-        setUser(profile);
+
+      // A silent token refresh carries the same identity we already resolved;
+      // re-querying `profiles` on every refresh would add a request per hour
+      // per open tab for no new information.
+      if (event === 'TOKEN_REFRESHED' && session) {
         setToken(session.access_token);
+        return;
+      }
+
+      if (session) {
+        await applySession(session);
       } else {
         setUser(null);
         setToken(null);
+        setProfileError(null);
       }
+      if (!mounted) return;
       setLoading(false);
     });
 
@@ -104,10 +140,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
-    supabase.auth.signOut();
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setToken(null);
+    setProfileError(null);
   };
 
   return (
@@ -116,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         token,
         loading,
+        profileError,
         login,
         logout,
         isAdmin: user?.role === 'admin',

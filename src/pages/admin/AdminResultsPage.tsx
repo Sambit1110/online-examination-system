@@ -1,30 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Result, Examination, IntegritySummary, IntegrityEvent } from '../../types';
 import { Badge } from '../../components/common/Badge';
-import { Spinner } from '../../components/common/Spinner';
 import { EmptyState } from '../../components/common/EmptyState';
+import { ErrorBanner } from '../../components/common/ErrorState';
 import { PageHeader } from '../../components/common/PageHeader';
 import { StatTile } from '../../components/common/StatTile';
 import { Modal } from '../../components/common/Modal';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { Pagination, clampPage } from '../../components/common/Pagination';
+import { SkeletonTable } from '../../components/common/Skeleton';
+import { Toolbar, SearchInput, FilterSelect } from '../../components/common/Toolbar';
+import { formatDateTime, formatTime, describeError } from '../../lib/format';
 import {
   Award,
-  Search,
-  Filter,
   Users,
-  CheckCircle2,
-  XCircle,
-  TrendingUp,
   Share2,
-  FileSpreadsheet,
   ShieldCheck,
   ShieldAlert,
   EyeOff,
   Eye,
   LogOut,
-  LogIn
+  LogIn,
+  TrendingUp,
+  CheckCircle2
 } from 'lucide-react';
+
+const PAGE_SIZE = 20;
 
 const INTEGRITY_EVENT_LABELS: Record<IntegrityEvent['type'], { label: string; icon: React.ReactNode }> = {
   tab_hidden: { label: 'Left the exam tab', icon: <EyeOff size={14} color="var(--color-warning)" /> },
@@ -33,89 +37,119 @@ const INTEGRITY_EVENT_LABELS: Record<IntegrityEvent['type'], { label: string; ic
   window_focus: { label: 'Window regained focus', icon: <LogIn size={14} color="var(--color-success)" /> }
 };
 
+// Honest aggregation of the real percentages — no modelling, no estimation.
+const BANDS = [
+  { label: '0–39%', min: 0, max: 39.999, tone: 'var(--color-danger)' },
+  { label: '40–59%', min: 40, max: 59.999, tone: 'var(--color-warning)' },
+  { label: '60–79%', min: 60, max: 79.999, tone: 'var(--color-accent-cyan)' },
+  { label: '80–100%', min: 80, max: 100, tone: 'var(--color-success)' }
+];
+
 export const AdminResultsPage: React.FC = () => {
   const { user } = useAuth();
+  const toast = useToast();
+
   const [exams, setExams] = useState<Examination[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string>('');
   const [results, setResults] = useState<Result[]>([]);
-  const [stats, setStats] = useState<any>(null);
   const [integrityByAttempt, setIntegrityByAttempt] = useState<Record<string, IntegritySummary>>({});
   const [trailFor, setTrailFor] = useState<{ summary: IntegritySummary; studentName: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [examsLoading, setExamsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [outcomeFilter, setOutcomeFilter] = useState('');
+  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [examListError, setExamListError] = useState<string | null>(null);
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  const [releaseBusy, setReleaseBusy] = useState(false);
+
+  const fetchExamList = useCallback(async () => {
+    if (!user) return;
+    setExamsLoading(true);
+    setExamListError(null);
+    try {
+      const { data, error: listError } = await supabase
+        .from('examinations')
+        .select('exam_id:id, title, results_released')
+        .order('start_time', { ascending: false });
+      if (listError) throw listError;
+
+      const list = (data || []) as unknown as Examination[];
+      setExams(list);
+      setSelectedExamId(prev => prev || list[0]?.exam_id || '');
+    } catch (err) {
+      setExamListError(describeError(err, 'Could not load the examination list.'));
+    } finally {
+      setExamsLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    const fetchExamList = async () => {
-      if (!user) return;
-      try {
-        const { data } = await supabase
-          .from('examinations')
-          .select('exam_id:id, title, results_released')
-          .order('created_at', { ascending: false });
-        setExams((data || []) as Examination[]);
-        if (data && data.length > 0 && !selectedExamId) {
-          setSelectedExamId(data[0].exam_id);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
     fetchExamList();
-  }, [user?.id]);
+  }, [fetchExamList]);
 
-  const fetchExamResults = async (examId: string) => {
-    if (!user || !examId) return;
+  const fetchExamResults = useCallback(async () => {
+    if (!user || !selectedExamId) return;
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-
       const [resultsRes, eventsRes] = await Promise.all([
         supabase
           .from('results')
-          .select(`
+          .select(
+            `
             result_id:id, attempt_id, marks_obtained, total_marks, percentage, status,
             total_questions, correct_count, incorrect_count, unanswered_count, evaluated_at,
             profiles(name, roll_number, email)
-          `)
-          .eq('exam_id', examId)
+          `
+          )
+          .eq('exam_id', selectedExamId)
           .order('marks_obtained', { ascending: false }),
         supabase
           .from('integrity_events')
           .select('attempt_id, event_type, away_ms, occurred_at')
-          .eq('exam_id', examId)
+          .eq('exam_id', selectedExamId)
           .order('occurred_at', { ascending: true })
       ]);
 
       if (resultsRes.error) throw resultsRes.error;
 
-      const mappedResults: Result[] = (resultsRes.data || []).map((r: any) => ({
-        result_id: r.result_id,
-        attempt_id: r.attempt_id,
-        user_id: '',
-        exam_id: examId,
-        marks_obtained: r.marks_obtained,
-        total_marks: r.total_marks,
-        percentage: r.percentage,
-        status: r.status,
-        total_questions: r.total_questions,
-        correct_count: r.correct_count,
-        incorrect_count: r.incorrect_count,
-        unanswered_count: r.unanswered_count,
-        evaluated_at: r.evaluated_at,
-        student_name: r.profiles?.name,
-        student_email: r.profiles?.email,
-        roll_number: r.profiles?.roll_number
-      }));
-      setResults(mappedResults);
+      setResults(
+        (resultsRes.data || []).map((r: any) => ({
+          result_id: r.result_id,
+          attempt_id: r.attempt_id,
+          user_id: '',
+          exam_id: selectedExamId,
+          marks_obtained: r.marks_obtained,
+          total_marks: r.total_marks,
+          percentage: r.percentage,
+          status: r.status,
+          total_questions: r.total_questions,
+          correct_count: r.correct_count,
+          incorrect_count: r.incorrect_count,
+          unanswered_count: r.unanswered_count,
+          evaluated_at: r.evaluated_at,
+          student_name: r.profiles?.name,
+          student_email: r.profiles?.email,
+          roll_number: r.profiles?.roll_number
+        }))
+      );
 
-      const examTitle = exams.find(e => e.exam_id === examId)?.title;
+      const examTitle = exams.find(e => e.exam_id === selectedExamId)?.title;
       const byAttempt: Record<string, IntegritySummary> = {};
       for (const evt of eventsRes.data || []) {
         if (!byAttempt[evt.attempt_id]) {
           byAttempt[evt.attempt_id] = {
-            attemptId: evt.attempt_id, examId, examTitle,
-            totalEvents: 0, tabHiddenCount: 0, windowBlurCount: 0, totalAwayMs: 0,
-            events: [], generatedAt: new Date().toISOString()
+            attemptId: evt.attempt_id,
+            examId: selectedExamId,
+            examTitle,
+            totalEvents: 0,
+            tabHiddenCount: 0,
+            windowBlurCount: 0,
+            totalAwayMs: 0,
+            events: [],
+            generatedAt: new Date().toISOString()
           };
         }
         const summary = byAttempt[evt.attempt_id];
@@ -123,49 +157,75 @@ export const AdminResultsPage: React.FC = () => {
         if (evt.event_type === 'tab_hidden') summary.tabHiddenCount += 1;
         if (evt.event_type === 'window_blur') summary.windowBlurCount += 1;
         summary.totalAwayMs += evt.away_ms || 0;
-        summary.events.push({ type: evt.event_type, timestamp: evt.occurred_at, awayMs: evt.away_ms ?? undefined });
+        summary.events.push({
+          type: evt.event_type,
+          timestamp: evt.occurred_at,
+          awayMs: evt.away_ms ?? undefined
+        });
       }
       setIntegrityByAttempt(byAttempt);
-
-      const total = mappedResults.length;
-      const passed = mappedResults.filter(r => r.status === 'pass').length;
-      const percentages = mappedResults.map(r => r.percentage);
-      setStats({
-        totalCandidates: total,
-        passedCandidates: passed,
-        failedCandidates: total - passed,
-        averagePercentage: total > 0 ? Math.round((percentages.reduce((a, b) => a + b, 0) / total) * 100) / 100 : 0,
-        highestPercentage: total > 0 ? Math.max(...percentages) : 0,
-        lowestPercentage: total > 0 ? Math.min(...percentages) : 0
-      });
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(describeError(err, 'Could not load the gradebook for this examination.'));
+      setResults([]);
+      setIntegrityByAttempt({});
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, selectedExamId, exams]);
 
   useEffect(() => {
-    if (selectedExamId) {
-      fetchExamResults(selectedExamId);
-    }
-  }, [selectedExamId, user?.id]);
+    fetchExamResults();
+  }, [fetchExamResults]);
 
-  const filteredResults = results.filter(r => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      r.student_name?.toLowerCase().includes(term) ||
-      r.roll_number?.toLowerCase().includes(term) ||
-      r.student_email?.toLowerCase().includes(term)
-    );
-  });
+  useEffect(() => {
+    setPage(1);
+  }, [selectedExamId, searchTerm, outcomeFilter]);
 
-  const handleToggleRelease = async () => {
-    const currentExam = exams.find(e => e.exam_id === selectedExamId);
+  const filteredResults = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return results.filter(r => {
+      if (outcomeFilter && r.status !== outcomeFilter) return false;
+      if (!term) return true;
+      return (
+        r.student_name?.toLowerCase().includes(term) ||
+        r.roll_number?.toLowerCase().includes(term) ||
+        r.student_email?.toLowerCase().includes(term)
+      );
+    });
+  }, [results, searchTerm, outcomeFilter]);
+
+  const stats = useMemo(() => {
+    const total = results.length;
+    if (total === 0) return null;
+    const passed = results.filter(r => r.status === 'pass').length;
+    const percentages = results.map(r => r.percentage);
+    return {
+      totalCandidates: total,
+      passedCandidates: passed,
+      passRate: Math.round((passed / total) * 100),
+      averagePercentage: Math.round((percentages.reduce((a, b) => a + b, 0) / total) * 10) / 10,
+      highestPercentage: Math.max(...percentages)
+    };
+  }, [results]);
+
+  const distribution = useMemo(() => {
+    if (results.length === 0) return [];
+    return BANDS.map(band => {
+      const count = results.filter(r => r.percentage >= band.min && r.percentage <= band.max).length;
+      return { ...band, count, share: Math.round((count / results.length) * 100) };
+    });
+  }, [results]);
+
+  const safePage = clampPage(page, PAGE_SIZE, filteredResults.length);
+  const pagedResults = filteredResults.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const currentExam = exams.find(e => e.exam_id === selectedExamId);
+  const isReleased = !!currentExam?.results_released;
+
+  const handleConfirmRelease = async () => {
     if (!currentExam || !user) return;
-    const nextState = !currentExam.results_released;
-
+    const nextState = !isReleased;
+    setReleaseBusy(true);
     try {
       const { error: updateError } = await supabase
         .from('examinations')
@@ -176,170 +236,283 @@ export const AdminResultsPage: React.FC = () => {
       await supabase.from('audit_logs').insert({
         user_id: user.id,
         action: nextState ? 'RELEASE_RESULTS' : 'UNRELEASE_RESULTS',
-        details: { examId: selectedExamId }
+        details: { examId: selectedExamId, title: currentExam.title }
       });
 
-      setExams(exams.map(e => e.exam_id === selectedExamId ? { ...e, results_released: nextState } : e));
+      setExams(prev =>
+        prev.map(e => (e.exam_id === selectedExamId ? { ...e, results_released: nextState } : e))
+      );
+      toast.success(
+        nextState
+          ? 'Results are now visible to candidates.'
+          : 'Results have been withheld from candidates.'
+      );
+      setReleaseOpen(false);
     } catch (err) {
-      console.error(err);
+      toast.error(describeError(err, 'Failed to change the result release state.'));
+    } finally {
+      setReleaseBusy(false);
     }
   };
 
-  const currentExam = exams.find(e => e.exam_id === selectedExamId);
-  const isReleased = !!currentExam?.results_released;
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="section-stack">
       <PageHeader
-        title="Examination Gradebook & Evaluation Analytics"
-        subtitle="Inspect candidate scores, percentage distribution, and control result publication (REQ-48, REQ-49)."
+        title="Gradebook"
+        subtitle="Review candidate scores for an examination, inspect session integrity trails, and control result publication."
       >
         {currentExam && (
           <button
-            onClick={handleToggleRelease}
-            className={`btn btn-sm ${isReleased ? 'btn-success' : 'btn-primary'}`}
+            onClick={() => setReleaseOpen(true)}
+            className={`btn ${isReleased ? 'btn-success' : 'btn-primary'}`}
           >
-            <Share2 size={15} />
-            {isReleased ? 'Results Released to Students' : 'Release Results to Students'}
+            <Share2 size={15} aria-hidden="true" />
+            {isReleased ? 'Results released' : 'Release results'}
           </button>
         )}
       </PageHeader>
 
-      {/* Select Exam & Search Controls */}
-      <div className="card" style={{ padding: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ flex: '1 1 300px' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>
-            Select Examination Cohort:
-          </label>
-          <select
-            className="form-select"
-            value={selectedExamId}
-            onChange={e => setSelectedExamId(e.target.value)}
-          >
-            {exams.map(ex => (
-              <option key={ex.exam_id} value={ex.exam_id}>
-                {ex.title} ({ex.exam_id})
-              </option>
-            ))}
-          </select>
-        </div>
+      {examListError && <ErrorBanner message={examListError} onRetry={fetchExamList} />}
 
-        <div style={{ flex: '1 1 240px', position: 'relative', marginTop: '1.25rem' }}>
-          <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input
-            type="text"
-            className="form-input"
-            placeholder="Search candidate by name or roll..."
+      <div className="card" style={{ padding: '1rem 1.15rem' }}>
+        <Toolbar>
+          <div className="toolbar__filter" style={{ flex: '1 1 280px' }}>
+            <label className="sr-only" htmlFor="gradebook-exam">
+              Select examination
+            </label>
+            <select
+              id="gradebook-exam"
+              className="form-select"
+              style={{ width: '100%' }}
+              value={selectedExamId}
+              onChange={e => setSelectedExamId(e.target.value)}
+              disabled={examsLoading || exams.length === 0}
+            >
+              {exams.length === 0 && <option value="">No examinations available</option>}
+              {exams.map(ex => (
+                <option key={ex.exam_id} value={ex.exam_id}>
+                  {ex.title} {ex.results_released ? '— released' : '— withheld'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <SearchInput
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={{ paddingLeft: '2.25rem' }}
+            onChange={setSearchTerm}
+            label="Search candidates by name, roll number or email"
+            placeholder="Search candidates…"
           />
-        </div>
+
+          <FilterSelect
+            value={outcomeFilter}
+            onChange={setOutcomeFilter}
+            label="Filter by outcome"
+            options={[
+              { value: '', label: 'All outcomes' },
+              { value: 'pass', label: 'Qualified' },
+              { value: 'fail', label: 'Not qualified' }
+            ]}
+          />
+        </Toolbar>
       </div>
 
-      {/* Examination Performance Metrics Strip */}
-      {stats && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: '1rem'
-        }}>
-          <StatTile label="Total Candidates" value={stats.totalCandidates} />
-          <StatTile label="Average Score" value={`${stats.averagePercentage}%`} valueColor="var(--color-action)" />
-          <StatTile label="Qualified Candidates" value={stats.passedCandidates} valueColor="var(--color-success)" />
-          <StatTile label="Highest Score" value={`${stats.highestPercentage}%`} valueColor="var(--color-brand-secondary)" />
-        </div>
+      {stats && !loading && (
+        <>
+          <div className="stat-grid">
+            <StatTile
+              className="animate-slide-up stagger-1"
+              label="Candidates"
+              value={stats.totalCandidates}
+              meta="Submissions graded"
+              icon={<Users size={16} />}
+            />
+            <StatTile
+              className="animate-slide-up stagger-2"
+              label="Average score"
+              value={`${stats.averagePercentage}%`}
+              meta="Across all submissions"
+              icon={<TrendingUp size={16} />}
+            />
+            <StatTile
+              className="animate-slide-up stagger-3"
+              label="Pass rate"
+              value={`${stats.passRate}%`}
+              meta={`${stats.passedCandidates} qualified`}
+              valueColor="var(--color-success)"
+              icon={<CheckCircle2 size={16} />}
+            />
+            <StatTile
+              className="animate-slide-up stagger-4"
+              label="Highest score"
+              value={`${stats.highestPercentage}%`}
+              meta="Top candidate"
+              icon={<Award size={16} />}
+            />
+          </div>
+
+          {/* Score spread, counted directly from the graded results. */}
+          <div className="card">
+            <div className="section-head" style={{ marginBottom: '0.75rem' }}>
+              <h2 className="section-head__title" style={{ fontSize: '0.95rem' }}>
+                Score distribution
+              </h2>
+              <span className="section-head__meta">{results.length} graded submissions</span>
+            </div>
+            <div className="distribution">
+              {distribution.map(band => (
+                <div className="distribution__row" key={band.label}>
+                  <span className="distribution__label">{band.label}</span>
+                  <div className="distribution__track">
+                    <div
+                      className="distribution__bar"
+                      style={{ width: `${band.share}%`, backgroundColor: band.tone }}
+                    />
+                  </div>
+                  <span className="distribution__count">
+                    {band.count} <span style={{ color: 'var(--text-muted)' }}>({band.share}%)</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Gradebook Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: '1rem 1.15rem' }}>
+        {error && <ErrorBanner message={error} onRetry={fetchExamResults} />}
+
         {loading ? (
-          <Spinner label="Loading gradebook records..." />
+          <SkeletonTable rows={6} columns={6} label="Loading gradebook" />
         ) : filteredResults.length === 0 ? (
-          <EmptyState icon={<Award size={30} strokeWidth={1.5} />} title="No candidate submissions found for this examination." />
+          <EmptyState
+            icon={<Award size={28} strokeWidth={1.5} />}
+            title={
+              results.length === 0
+                ? 'No submissions for this examination yet'
+                : 'No candidates match these filters'
+            }
+            description={
+              results.length === 0
+                ? 'Candidate results appear here as soon as papers are submitted and graded.'
+                : 'Adjust the search or outcome filter to see more candidates.'
+            }
+          />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="academic-table">
-              <thead>
-                <tr>
-                  <th>Candidate Details</th>
-                  <th>Marks Secured</th>
-                  <th>Percentage</th>
-                  <th>Correct / Total</th>
-                  <th>Result Status</th>
-                  <th>Integrity</th>
-                  <th>Submission Timestamp</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredResults.map(res => {
-                  const integrity = integrityByAttempt[res.attempt_id];
-                  const awayCount = integrity ? integrity.tabHiddenCount + integrity.windowBlurCount : 0;
-                  return (
-                  <tr key={res.result_id}>
-                    <td>
-                      <div style={{ fontWeight: 700, color: 'var(--color-brand-primary)' }}>
-                        {res.student_name}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                        Roll: {res.roll_number || 'N/A'} • {res.student_email}
-                      </div>
-                    </td>
-                    <td>
-                      <strong style={{ fontSize: '1rem', color: 'var(--color-brand-primary)', fontFamily: 'var(--font-heading)' }}>
-                        {res.marks_obtained}
-                      </strong>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}> / {res.total_marks}</span>
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 700, color: res.status === 'pass' ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                        {res.percentage}%
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.8125rem' }}>
-                        <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>{res.correct_count} correct</span>
-                        <span style={{ color: 'var(--text-muted)' }}> / {res.total_questions} questions</span>
-                      </div>
-                    </td>
-                    <td>
-                      <Badge type={res.status === 'pass' ? 'pass' : 'fail'}>
-                        {res.status === 'pass' ? 'QUALIFIED' : 'FAILED'}
-                      </Badge>
-                    </td>
-                    <td>
-                      {integrity ? (
-                        <button
-                          onClick={() => setTrailFor({ summary: integrity, studentName: res.student_name || 'Candidate' })}
-                          className="btn btn-secondary btn-sm"
-                          title="View exam-session integrity trail"
-                          aria-label={`View integrity trail for ${res.student_name}`}
-                          style={awayCount > 0 ? { color: 'var(--color-warning)', borderColor: 'var(--color-warning-border)', backgroundColor: 'var(--color-warning-bg)' } : { color: 'var(--color-success)' }}
-                        >
-                          {awayCount > 0 ? <ShieldAlert size={14} /> : <ShieldCheck size={14} />}
-                          {awayCount > 0 ? `${awayCount} noted` : 'Clean'}
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Not tracked</span>
-                      )}
-                    </td>
-                    <td style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                      {new Date(res.evaluated_at).toLocaleString()}
-                    </td>
+          <>
+            <div className="table-wrap">
+              <table className="academic-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Candidate</th>
+                    <th scope="col">Marks</th>
+                    <th scope="col">Percentage</th>
+                    <th scope="col">Correct</th>
+                    <th scope="col">Outcome</th>
+                    <th scope="col">Integrity</th>
+                    <th scope="col">Submitted</th>
                   </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {pagedResults.map(res => {
+                    const integrity = integrityByAttempt[res.attempt_id];
+                    const awayCount = integrity
+                      ? integrity.tabHiddenCount + integrity.windowBlurCount
+                      : 0;
+
+                    return (
+                      <tr key={res.result_id}>
+                        <td>
+                          <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                            {res.student_name}
+                          </div>
+                          <div className="row-meta" style={{ fontFamily: 'var(--font-mono)' }}>
+                            {res.roll_number || '—'}
+                          </div>
+                        </td>
+                        <td>
+                          <strong style={{ fontSize: '0.95rem', fontFamily: 'var(--font-mono)' }}>
+                            {res.marks_obtained}
+                          </strong>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {' '}
+                            / {res.total_marks}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color:
+                                res.status === 'pass' ? 'var(--color-success)' : 'var(--color-danger)'
+                            }}
+                          >
+                            {res.percentage}%
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '0.8125rem' }}>
+                          <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>
+                            {res.correct_count}
+                          </span>
+                          <span style={{ color: 'var(--text-muted)' }}> / {res.total_questions}</span>
+                        </td>
+                        <td>
+                          <Badge type={res.status === 'pass' ? 'pass' : 'fail'}>
+                            {res.status === 'pass' ? 'Qualified' : 'Not qualified'}
+                          </Badge>
+                        </td>
+                        <td>
+                          {integrity ? (
+                            <button
+                              onClick={() =>
+                                setTrailFor({
+                                  summary: integrity,
+                                  studentName: res.student_name || 'Candidate'
+                                })
+                              }
+                              className={`btn btn-sm ${awayCount > 0 ? 'btn-secondary btn-secondary--warning' : 'btn-secondary'}`}
+                              title="View the session integrity trail"
+                              aria-label={`View integrity trail for ${res.student_name}`}
+                            >
+                              {awayCount > 0 ? (
+                                <ShieldAlert size={14} aria-hidden="true" />
+                              ) : (
+                                <ShieldCheck size={14} aria-hidden="true" />
+                              )}
+                              {awayCount > 0 ? `${awayCount} noted` : 'Clean'}
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              Not tracked
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                          {formatDateTime(res.evaluated_at)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              page={safePage}
+              pageSize={PAGE_SIZE}
+              totalItems={filteredResults.length}
+              onPageChange={setPage}
+              itemLabel="candidates"
+            />
+          </>
         )}
       </div>
 
-      {/* INTEGRITY TRAIL VIEWER */}
+      {/* INTEGRITY TRAIL */}
       <Modal
         isOpen={!!trailFor}
         onClose={() => setTrailFor(null)}
-        title="Exam Session Integrity Trail"
+        title="Session integrity trail"
         footer={
           <button onClick={() => setTrailFor(null)} className="btn btn-secondary">
             Close
@@ -347,59 +520,43 @@ export const AdminResultsPage: React.FC = () => {
         }
       >
         {trailFor && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="form-stack">
             <p style={{ fontSize: '0.84rem' }}>
               Candidate: <strong>{trailFor.studentName}</strong>
-              {trailFor.summary.examTitle && <> • {trailFor.summary.examTitle}</>}
+              {trailFor.summary.examTitle && <> · {trailFor.summary.examTitle}</>}
             </p>
 
             <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                backgroundColor: (trailFor.summary.tabHiddenCount + trailFor.summary.windowBlurCount) > 0 ? 'var(--color-warning-bg)' : 'var(--color-success-bg)',
-                border: `1px solid ${(trailFor.summary.tabHiddenCount + trailFor.summary.windowBlurCount) > 0 ? 'var(--color-warning-border)' : 'var(--color-success-border)'}`,
-                color: (trailFor.summary.tabHiddenCount + trailFor.summary.windowBlurCount) > 0 ? 'var(--color-warning)' : 'var(--color-success)',
-                padding: '0.65rem 0.85rem',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: '0.8125rem'
-              }}
+              className={`confirm-callout${trailFor.summary.tabHiddenCount + trailFor.summary.windowBlurCount > 0 ? '' : ' confirm-callout--success'}`}
             >
-              {(trailFor.summary.tabHiddenCount + trailFor.summary.windowBlurCount) > 0 ? <ShieldAlert size={16} style={{ flexShrink: 0 }} /> : <ShieldCheck size={16} style={{ flexShrink: 0 }} />}
+              {trailFor.summary.tabHiddenCount + trailFor.summary.windowBlurCount > 0 ? (
+                <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '0.1rem' }} aria-hidden="true" />
+              ) : (
+                <ShieldCheck size={16} style={{ flexShrink: 0, marginTop: '0.1rem' }} aria-hidden="true" />
+              )}
               <span>
-                <strong>{trailFor.summary.tabHiddenCount}</strong> tab exit{trailFor.summary.tabHiddenCount === 1 ? '' : 's'} •{' '}
-                <strong>{trailFor.summary.windowBlurCount}</strong> focus loss{trailFor.summary.windowBlurCount === 1 ? '' : 'es'} •{' '}
-                <strong>{Math.round(trailFor.summary.totalAwayMs / 1000)}s</strong> total away time
+                <strong>{trailFor.summary.tabHiddenCount}</strong> tab exit
+                {trailFor.summary.tabHiddenCount === 1 ? '' : 's'} ·{' '}
+                <strong>{trailFor.summary.windowBlurCount}</strong> focus loss
+                {trailFor.summary.windowBlurCount === 1 ? '' : 'es'} ·{' '}
+                <strong>{Math.round(trailFor.summary.totalAwayMs / 1000)}s</strong> total away
               </span>
             </div>
 
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              This is an observational trail only — it does not affect the candidate's score. A small number of
-              brief events is common and expected; use judgement rather than treating any single event as proof
-              of misconduct.
+            <p className="muted-note">
+              This is an observational trail only — it does not affect the candidate&apos;s score. A small
+              number of brief events is common and expected; use judgement rather than treating any single
+              event as proof of misconduct.
             </p>
 
-            <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div className="trail-list">
               {trailFor.summary.events.length === 0 ? (
-                <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>
+                <p className="muted-note" style={{ textAlign: 'center', padding: '1rem' }}>
                   No focus-loss events were recorded during this session.
-                </div>
+                </p>
               ) : (
                 trailFor.summary.events.map((evt, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.5rem 0.7rem',
-                      borderRadius: 'var(--radius-xs)',
-                      backgroundColor: 'var(--bg-page)',
-                      border: '1px solid var(--border-subtle)',
-                      fontSize: '0.8125rem'
-                    }}
-                  >
+                  <div key={idx} className="trail-list__row">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {INTEGRITY_EVENT_LABELS[evt.type]?.icon}
                       <span>{INTEGRITY_EVENT_LABELS[evt.type]?.label || evt.type}</span>
@@ -409,8 +566,15 @@ export const AdminResultsPage: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
-                      {new Date(evt.timestamp).toLocaleTimeString()}
+                    <span
+                      style={{
+                        color: 'var(--text-muted)',
+                        fontSize: '0.72rem',
+                        fontFamily: 'var(--font-mono)',
+                        flexShrink: 0
+                      }}
+                    >
+                      {formatTime(evt.timestamp)}
                     </span>
                   </div>
                 ))
@@ -419,6 +583,32 @@ export const AdminResultsPage: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* RELEASE CONFIRMATION */}
+      <ConfirmDialog
+        isOpen={releaseOpen}
+        onCancel={() => setReleaseOpen(false)}
+        onConfirm={handleConfirmRelease}
+        tone="primary"
+        title={isReleased ? 'Withhold results' : 'Release results to candidates'}
+        confirmLabel={isReleased ? 'Withhold results' : 'Release results'}
+        busy={releaseBusy}
+        busyLabel={isReleased ? 'Withholding…' : 'Releasing…'}
+        message={
+          isReleased ? (
+            <>
+              Marks and the answer key for <strong>{currentExam?.title}</strong> will be hidden from
+              candidates again.
+            </>
+          ) : (
+            <>
+              All <strong>{results.length}</strong> candidate{results.length === 1 ? '' : 's'} who sat{' '}
+              <strong>{currentExam?.title}</strong> will immediately see their marks, grade and the full
+              answer key.
+            </>
+          )
+        }
+      />
     </div>
   );
 };

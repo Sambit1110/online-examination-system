@@ -1,23 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Examination } from '../../types';
 import { Badge } from '../../components/common/Badge';
-import { Spinner } from '../../components/common/Spinner';
 import { EmptyState } from '../../components/common/EmptyState';
+import { ErrorBanner } from '../../components/common/ErrorState';
+import { SkeletonCards } from '../../components/common/Skeleton';
 import { TiltCard } from '../../components/common/TiltCard';
+import { formatDateTime, formatRelative, describeError } from '../../lib/format';
 import {
   Clock,
   Calendar,
   FileText,
   Award,
-  ArrowRight,
-  CheckCircle2,
-  AlertTriangle,
   Play,
   RotateCcw,
   BookOpen,
-  UserCheck,
   CalendarClock
 } from 'lucide-react';
 
@@ -44,30 +42,32 @@ const computeAccessState = (
   return { accessState: 'live', canStart: true };
 };
 
+/** Short, human-quotable reference derived from the real exam id. */
+const shortRef = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
+
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam, onViewResult }) => {
   const { user } = useAuth();
   const [exams, setExams] = useState<Examination[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchExams = async () => {
+  const fetchExams = useCallback(async () => {
     if (!user) return;
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-
       const [examsRes, attemptsRes, resultsRes] = await Promise.all([
         supabase
           .from('examinations')
-          .select(`
+          .select(
+            `
             exam_id:id, title, description, duration_minutes, start_time, end_time,
             total_marks, pass_percentage, negative_marks_per_question, status, results_released,
             exam_questions(count)
-          `)
+          `
+          )
           .order('start_time', { ascending: true }),
-        supabase
-          .from('exam_attempts')
-          .select('exam_id, attempt_id:id, status')
-          .eq('user_id', user.id),
+        supabase.from('exam_attempts').select('exam_id, attempt_id:id, status').eq('user_id', user.id),
         supabase
           .from('results')
           .select('exam_id, result_id:id, marks_obtained, percentage, status')
@@ -111,180 +111,172 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
       });
 
       setExams(processed);
-    } catch (err: any) {
-      setError(err.message || 'Error loading dashboard');
+    } catch (err) {
+      setError(describeError(err, 'Could not load your examination roster.'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchExams();
-  }, [user?.id]);
-
-  if (loading) {
-    return <Spinner label="Loading candidate examination roster..." />;
-  }
+  }, [fetchExams]);
 
   const liveExams = exams.filter(e => e.accessState === 'live' || e.accessState === 'in_progress');
   const upcomingExams = exams.filter(e => e.accessState === 'upcoming');
   const completedExams = exams.filter(e => e.accessState === 'completed');
 
-  const completedCount = completedExams.length;
   const completedWithScores = completedExams.filter(e => typeof e.percentage === 'number');
-  const avgScore = completedWithScores.length > 0
-    ? Math.round(completedWithScores.reduce((acc, curr) => acc + (curr.percentage || 0), 0) / completedWithScores.length)
-    : 0;
+  const avgScore =
+    completedWithScores.length > 0
+      ? Math.round(
+          completedWithScores.reduce((acc, curr) => acc + (curr.percentage || 0), 0) /
+            completedWithScores.length
+        )
+      : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {/* Candidate Academic Dossier Banner */}
-      <div className="glass-panel animate-slide-up" style={{
-        borderLeft: '4px solid var(--color-action)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '1.5rem 2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1.5rem'
-      }}>
+    <div className="page-stack">
+      {/* Candidate banner */}
+      <div className="glass-panel page-banner animate-slide-up">
         <div>
-          <div style={{
-            fontSize: '0.72rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            color: 'var(--text-muted)',
-            fontWeight: 700,
-            marginBottom: '0.2rem'
-          }}>
-            Candidate Examination Dossier
-          </div>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: 600, color: 'var(--text-main)' }}>
-            {user?.name}
-          </h1>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
-            <span>Roll: <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>{user?.rollNumber || 'UG/SOET/30/24/043'}</strong></span>
-            <span>•</span>
-            <span>B.Tech (Hons) CSE</span>
-            <span>•</span>
-            <span style={{ color: 'var(--color-success)', fontWeight: 500 }}>Eligible</span>
+          <div className="page-banner__eyebrow">Candidate dashboard</div>
+          <h1 className="page-banner__title">{user?.name}</h1>
+          <div className="page-banner__desc" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            {user?.rollNumber && (
+              <span>
+                Roll:{' '}
+                <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
+                  {user.rollNumber}
+                </strong>
+              </span>
+            )}
+            {user?.department && (
+              <>
+                {user?.rollNumber && <span aria-hidden="true">•</span>}
+                <span>{user.department}</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Academic Metric Strip */}
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div style={{
-            padding: '0.5rem 0.85rem',
-            backgroundColor: 'var(--bg-surface-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border-subtle)',
-            textAlign: 'center',
-            minWidth: '80px'
-          }}>
-            <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Active</div>
-            <div style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--color-success)', marginTop: '0.1rem' }}>{liveExams.length}</div>
+        <div className="metric-strip">
+          <div className="metric-chip">
+            <div className="metric-chip__label">Active</div>
+            <div className="metric-chip__value" style={{ color: 'var(--color-success)' }}>
+              {loading ? '—' : liveExams.length}
+            </div>
           </div>
-          <div style={{
-            padding: '0.5rem 0.85rem',
-            backgroundColor: 'var(--bg-surface-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border-subtle)',
-            textAlign: 'center',
-            minWidth: '80px'
-          }}>
-            <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Completed</div>
-            <div style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.1rem' }}>{completedCount}</div>
+          <div className="metric-chip">
+            <div className="metric-chip__label">Completed</div>
+            <div className="metric-chip__value">{loading ? '—' : completedExams.length}</div>
           </div>
-          <div style={{
-            padding: '0.5rem 0.85rem',
-            backgroundColor: 'var(--bg-surface-secondary)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border-subtle)',
-            textAlign: 'center',
-            minWidth: '80px'
-          }}>
-            <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Average</div>
-            <div style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--color-action)', marginTop: '0.1rem' }}>{completedWithScores.length > 0 ? `${avgScore}%` : '—'}</div>
+          <div className="metric-chip">
+            <div className="metric-chip__label">Average</div>
+            <div className="metric-chip__value" style={{ color: 'var(--color-action-hover)' }}>
+              {loading || avgScore === null ? '—' : `${avgScore}%`}
+            </div>
           </div>
         </div>
       </div>
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && <ErrorBanner message={error} onRetry={fetchExams} />}
 
-      {/* 1. ACTIVE / LIVE EXAMINATIONS (High Priority Focus) */}
+      {/* 1. LIVE EXAMINATIONS */}
       <section className="animate-slide-up stagger-1">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span className="pulse-dot-live" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-success)', display: 'inline-block' }} />
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>
-              Live Examinations Permitted for Attempt ({liveExams.length})
-            </h2>
-          </div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            Schedule active • Direct entry
-          </span>
+        <div className="section-head">
+          <h2 className="section-head__title">
+            <span
+              className="pulse-dot-live"
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--color-success)',
+                display: 'inline-block'
+              }}
+              aria-hidden="true"
+            />
+            Available now {!loading && `(${liveExams.length})`}
+          </h2>
+          <span className="section-head__meta">Open for attempt within the scheduled window</span>
         </div>
 
-        {liveExams.length === 0 ? (
+        {loading ? (
+          <SkeletonCards count={2} height="230px" label="Loading available examinations" />
+        ) : liveExams.length === 0 ? (
           <div className="card">
             <EmptyState
-              icon={<BookOpen size={30} strokeWidth={1.5} />}
-              title="No examinations are currently active for your cohort."
-              description="Please consult the upcoming schedule below."
+              icon={<BookOpen size={28} strokeWidth={1.5} />}
+              title="No examinations are open right now"
+              description="Anything scheduled for you appears here the moment its window opens."
             />
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.25rem' }}>
+          <div className="card-grid">
             {liveExams.map((exam, idx) => (
               <TiltCard
                 key={exam.exam_id}
                 maxTilt={4}
                 className={`card animate-slide-up stagger-${(idx % 4) + 1}`}
-                style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderTop: '3px solid var(--color-action)' }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderTop: '3px solid var(--color-action)'
+                }}
               >
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                  <div className="detail-row" style={{ marginBottom: '0.7rem' }}>
                     <Badge type={exam.attempt_status === 'in_progress' ? 'in_progress' : 'live'}>
-                      {exam.attempt_status === 'in_progress' ? 'Session In Progress' : 'Live Examination'}
+                      {exam.attempt_status === 'in_progress' ? 'In progress' : 'Live'}
                     </Badge>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      {exam.exam_id}
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        color: 'var(--text-muted)',
+                        fontFamily: 'var(--font-mono)'
+                      }}
+                    >
+                      {shortRef(exam.exam_id)}
                     </span>
                   </div>
 
-                  <h3 style={{ fontSize: '1.1rem', marginBottom: '0.4rem', color: 'var(--color-brand-primary)' }}>
-                    {exam.title}
-                  </h3>
+                  <h3 style={{ fontSize: '1.05rem', marginBottom: '0.4rem' }}>{exam.title}</h3>
 
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem', marginBottom: '1.25rem', lineHeight: 1.55 }}>
-                    {exam.description || 'Departmental formal examination.'}
-                  </p>
+                  {exam.description && (
+                    <p
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.84rem',
+                        marginBottom: '1.15rem',
+                        lineHeight: 1.55
+                      }}
+                    >
+                      {exam.description}
+                    </p>
+                  )}
 
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '0.75rem',
-                    padding: '0.75rem 0.9rem',
-                    backgroundColor: 'var(--bg-surface-secondary)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--border-subtle)',
-                    fontSize: '0.8125rem',
-                    marginBottom: '1.25rem'
-                  }}>
+                  <div className="meta-grid exam-summary-box">
                     <div>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block', textTransform: 'uppercase' }}>Duration:</span>
-                      <strong style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.1rem' }}>
-                        <Clock size={13} color="var(--color-action)" /> {exam.duration_minutes} Minutes
-                      </strong>
+                      <div className="meta-grid__label">Duration</div>
+                      <div className="meta-grid__value">
+                        <Clock size={13} color="var(--color-action-hover)" aria-hidden="true" />{' '}
+                        {exam.duration_minutes} minutes
+                      </div>
                     </div>
                     <div>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'block', textTransform: 'uppercase' }}>Weightage:</span>
-                      <strong style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.1rem' }}>
-                        <FileText size={13} color="var(--color-success)" /> {exam.question_count || 10} MCQs ({exam.total_marks} Marks)
-                      </strong>
+                      <div className="meta-grid__label">Paper</div>
+                      <div className="meta-grid__value">
+                        <FileText size={13} color="var(--color-success)" aria-hidden="true" />{' '}
+                        {exam.question_count} questions · {exam.total_marks} marks
+                      </div>
                     </div>
                   </div>
+
+                  <p className="muted-note" style={{ marginBottom: '1.15rem' }}>
+                    Closes {formatDateTime(exam.end_time)}
+                  </p>
                 </div>
 
                 <button
@@ -294,11 +286,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
                 >
                   {exam.attempt_status === 'in_progress' ? (
                     <>
-                      <RotateCcw size={15} /> Resume Examination Session
+                      <RotateCcw size={15} aria-hidden="true" /> Resume examination
                     </>
                   ) : (
                     <>
-                      <Play size={15} /> Review Instructions & Begin
+                      <Play size={15} aria-hidden="true" /> Review instructions &amp; begin
                     </>
                   )}
                 </button>
@@ -308,136 +300,156 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
         )}
       </section>
 
-      {/* 2. UPCOMING EXAMINATIONS (Timeline Layout) */}
+      {/* 2. UPCOMING */}
       <section className="animate-slide-up stagger-2">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>
-            Scheduled Upcoming Examinations ({upcomingExams.length})
-          </h2>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            Schedule locked until configured start time (BR-02)
-          </span>
+        <div className="section-head">
+          <h2 className="section-head__title">Scheduled {!loading && `(${upcomingExams.length})`}</h2>
+          <span className="section-head__meta">Locked until the published start time</span>
         </div>
 
-        {upcomingExams.length === 0 ? (
+        {loading ? (
+          <SkeletonCards count={2} height="150px" label="Loading scheduled examinations" />
+        ) : upcomingExams.length === 0 ? (
           <div className="card">
             <EmptyState
-              icon={<CalendarClock size={30} strokeWidth={1.5} />}
-              title="No additional upcoming examinations currently scheduled."
+              icon={<CalendarClock size={28} strokeWidth={1.5} />}
+              title="Nothing scheduled ahead"
+              description="Upcoming papers appear here as soon as they are published."
             />
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }}>
+          <div className="card-grid">
             {upcomingExams.map((exam, idx) => (
-              <div key={exam.exam_id} className={`card card-hover animate-slide-up stagger-${(idx % 4) + 1}`} style={{ backgroundColor: 'var(--bg-surface)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <div
+                key={exam.exam_id}
+                className={`card card-hover animate-slide-up stagger-${(idx % 4) + 1}`}
+              >
+                <div className="detail-row" style={{ marginBottom: '0.55rem' }}>
                   <Badge type="scheduled">Scheduled</Badge>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                    {exam.exam_id}
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      color: 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                  >
+                    {shortRef(exam.exam_id)}
                   </span>
                 </div>
 
-                <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>
-                  {exam.title}
-                </h3>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>{exam.title}</h3>
 
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', marginBottom: '1rem' }}>
-                  {exam.description}
-                </p>
+                {exam.description && (
+                  <p
+                    style={{
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.8125rem',
+                      marginBottom: '1rem'
+                    }}
+                  >
+                    {exam.description}
+                  </p>
+                )}
 
-                <div style={{
-                  backgroundColor: 'var(--color-warning-bg)',
-                  border: '1px solid var(--color-warning-border)',
-                  padding: '0.55rem 0.75rem',
-                  borderRadius: 'var(--radius-xs)',
-                  fontSize: '0.78rem',
-                  color: 'var(--color-warning)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  marginBottom: '1rem'
-                }}>
-                  <Calendar size={14} />
+                <div className="schedule-note">
+                  <Calendar size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
                   <span>
-                    Opens: <strong>{new Date(exam.start_time).toLocaleString()}</strong>
+                    Opens <strong>{formatDateTime(exam.start_time)}</strong>
+                    <span style={{ opacity: 0.8 }}> · {formatRelative(exam.start_time)}</span>
                   </span>
                 </div>
 
-                <button disabled className="btn btn-secondary btn-sm" style={{ width: '100%', cursor: 'not-allowed' }}>
-                  Locked Until Start Window
-                </button>
+                <div className="muted-note" style={{ marginTop: '0.75rem' }}>
+                  {exam.duration_minutes} minutes · {exam.total_marks} marks
+                </div>
               </div>
             ))}
           </div>
         )}
       </section>
 
-      {/* 3. COMPLETED EXAMINATIONS & ACADEMIC TRANSCRIPTS */}
+      {/* 3. COMPLETED */}
       <section className="animate-slide-up stagger-3">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>
-            Official Completed Examination Records ({completedExams.length})
-          </h2>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            Provisional grade slips and evaluation records
-          </span>
+        <div className="section-head">
+          <h2 className="section-head__title">Completed {!loading && `(${completedExams.length})`}</h2>
+          <span className="section-head__meta">Grade slips and submission records</span>
         </div>
 
-        {completedExams.length === 0 ? (
+        {loading ? (
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <SkeletonCards count={1} height="120px" label="Loading completed examinations" />
+          </div>
+        ) : completedExams.length === 0 ? (
           <div className="card">
             <EmptyState
-              icon={<Award size={30} strokeWidth={1.5} />}
-              title="You have no recorded completed examinations for this academic term."
+              icon={<Award size={28} strokeWidth={1.5} />}
+              title="No completed examinations yet"
+              description="Once you submit a paper it is recorded here with its grade slip."
             />
           </div>
         ) : (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-wrap">
               <table className="academic-table">
                 <thead>
                   <tr>
-                    <th>Examination Paper</th>
-                    <th>Weightage</th>
-                    <th>Status</th>
-                    <th>Marks Secured</th>
-                    <th style={{ textAlign: 'right' }}>Official Document</th>
+                    <th scope="col">Examination</th>
+                    <th scope="col">Total marks</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Score</th>
+                    <th scope="col" style={{ textAlign: 'right' }}>
+                      Grade slip
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {completedExams.map(exam => (
                     <tr key={exam.exam_id}>
                       <td>
-                        <div style={{ fontWeight: 700, color: 'var(--color-brand-primary)' }}>
-                          {exam.title}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                          {exam.exam_id} • {exam.duration_minutes} Mins Duration
+                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{exam.title}</div>
+                        <div
+                          style={{
+                            fontSize: '0.7rem',
+                            color: 'var(--text-muted)',
+                            fontFamily: 'var(--font-mono)'
+                          }}
+                        >
+                          {shortRef(exam.exam_id)} · {exam.duration_minutes} min
                         </div>
                       </td>
-                      <td>
-                        <strong style={{ fontFamily: 'var(--font-mono)' }}>{exam.total_marks} Marks</strong>
-                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{exam.total_marks}</td>
                       <td>
                         <Badge type={exam.results_released ? 'released' : 'completed'}>
-                          {exam.results_released ? 'Results Released' : 'Under Evaluation'}
+                          {exam.results_released ? 'Released' : 'Under evaluation'}
                         </Badge>
                       </td>
                       <td>
                         {exam.results_released && typeof exam.marks_obtained === 'number' ? (
-                          <div style={{ fontWeight: 700, color: exam.result_status === 'pass' ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                            {exam.marks_obtained} / {exam.total_marks} ({exam.percentage}%)
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              color:
+                                exam.result_status === 'pass'
+                                  ? 'var(--color-success)'
+                                  : 'var(--color-danger)'
+                            }}
+                          >
+                            {exam.marks_obtained} / {exam.total_marks}
+                            <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                              {' '}
+                              ({exam.percentage}%)
+                            </span>
                           </div>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>Withheld until release</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+                            Withheld until release
+                          </span>
                         )}
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <button
-                          onClick={() => onViewResult(exam.exam_id)}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          <Award size={14} color="var(--color-action)" />
-                          {exam.results_released ? 'View Grade Slip' : 'View Submission'}
+                        <button onClick={() => onViewResult(exam.exam_id)} className="btn btn-secondary btn-sm">
+                          <Award size={14} aria-hidden="true" />
+                          {exam.results_released ? 'View grade slip' : 'View submission'}
                         </button>
                       </td>
                     </tr>

@@ -44,7 +44,8 @@ and which dev command you run — the two modes don't interfere with each other.
 
 - Student login (email **or** university roll number) with secure sessions
 - Role-based access control — students can never reach admin functionality
-- Timed exams with question navigation, mark-for-review, and live autosave
+- Timed exams with question navigation, mark-for-review, and resilient
+  autosave (queued, retried with backoff, and flushed before submission)
 - Tab/window focus integrity monitoring during exams (see below) — no
   webcam, microphone, or screen recording of any kind
 - Automatic, tamper-proof grading — correct answers are never sent to the
@@ -52,7 +53,11 @@ and which dev command you run — the two modes don't interfere with each other.
 - Admin console: create/edit/publish exams, author questions, assign
   questions to exams, release results, manage user accounts, live
   "who's taking an exam right now" monitor, audit trail
-- Responsive, accessible UI with loading/empty/error states throughout
+- Paginated, searchable admin tables with debounced filtering
+- Confirmation dialogs on every high-impact action — record deletion,
+  releasing results to a cohort, and exporting the database
+- Responsive, accessible UI with loading/skeleton, empty and error states
+  throughout, a focus-trapped modal, and a skip link
 - Premium dark theme with a lazy-loaded 3D hero scene on the login page
   (React Three Fiber), glassmorphic panels, and pointer-driven tilt cards on
   dashboards — see [Design system](#design-system) below
@@ -94,7 +99,21 @@ shadow, and radius is a token, so the whole app re-themes from one file.
   scroll/hover animation during an active exam — only refined depth via
   shadows, to keep the highest-stakes screen calm and legible.
 - Respects `prefers-reduced-motion` throughout (`src/hooks/usePrefersReducedMotion.ts`),
-  including disabling all CSS transition/animation durations globally.
+  including disabling all CSS transition/animation durations globally, and
+  suppressing the pass-result confetti.
+- **Layout is class-driven, not inline**: shared primitives (`.page-stack`,
+  `.card-grid`, `.admin-split`, `.stat-grid`, `.toolbar`, `.table-wrap`)
+  live in the stylesheet so every layout actually reflows at the documented
+  breakpoints instead of relying on incidental behaviour.
+
+### Shared components
+
+`src/components/common/` holds the reusable pieces every screen is built
+from — `Modal` (focus-trapped, scroll-locking, restores focus on close),
+`ConfirmDialog`, `Toolbar`/`SearchInput`/`FilterSelect`, `Pagination`,
+`Skeleton`, `EmptyState`, `ErrorState`/`ErrorBanner`, `Badge`, `StatTile`,
+`TiltCard` and `ErrorBoundary`. Prefer extending these over re-implementing
+a search bar or a table shell inside a page.
 
 ---
 
@@ -223,6 +242,27 @@ written live to the `integrity_events` table and shown to the student as a
 small, calm status indicator ("Integrity: Monitored" / "Integrity: N
 noted") — never a threat, never an auto-submit or auto-fail. Administrators
 can view the full chronological trail for any attempt from the gradebook.
+
+---
+
+## Exam timing & autosave
+
+Two properties of the exam screen are worth knowing before changing it:
+
+- **The countdown is anchored to a wall-clock deadline**, not decremented
+  once per second. The server's remaining time is converted to an absolute
+  instant on load and every tick recomputes from `Date.now()`. A decrementing
+  counter drifts whenever the tab is throttled or the machine sleeps, which
+  would hand a candidate extra minutes. The server stays authoritative —
+  `start_exam_attempt` recomputes remaining time from `start_time` on every
+  resume, and grading only ever happens in `submit_exam_attempt`.
+- **Autosave is a queue, not a fire-and-forget call.** The latest intended
+  answer per question is held in a map and drained serially, so two quick
+  edits cannot land out of order. A failed write stays queued and is retried
+  with exponential backoff (and immediately on `online` or tab refocus). The
+  header reports how many responses are still unsaved, `beforeunload` warns
+  while any remain, and **submission flushes the queue first** — grading reads
+  `submitted_answers`, so an unflushed selection would otherwise score zero.
 
 ---
 

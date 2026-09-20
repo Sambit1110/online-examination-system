@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { ToastContainer, ToastMessage } from '../components/common/Toast';
 
 interface ToastContextType {
@@ -24,11 +24,17 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     window.setTimeout(() => dismiss(id), 5000);
   }, [dismiss]);
 
-  const value: ToastContextType = {
-    success: (message: string) => push('success', message),
-    error: (message: string) => push('error', message),
-    info: (message: string) => push('info', message)
-  };
+  // Memoised: a fresh object here changes identity on every provider render,
+  // which propagates through every useCallback that depends on `toast` and
+  // re-runs consumers' effects — including the exam page's timer interval.
+  const value = useMemo<ToastContextType>(
+    () => ({
+      success: (message: string) => push('success', message),
+      error: (message: string) => push('error', message),
+      info: (message: string) => push('info', message)
+    }),
+    [push]
+  );
 
   return (
     <ToastContext.Provider value={value}>

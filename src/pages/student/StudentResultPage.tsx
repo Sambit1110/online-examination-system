@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import confetti from 'canvas-confetti';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Result, Question } from '../../types';
 import { Badge } from '../../components/common/Badge';
 import { Spinner } from '../../components/common/Spinner';
+import { EmptyState } from '../../components/common/EmptyState';
+import { ErrorState } from '../../components/common/ErrorState';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
+import { formatDateTime, describeError } from '../../lib/format';
 import {
   Award,
   CheckCircle2,
@@ -12,14 +15,9 @@ import {
   HelpCircle,
   Printer,
   ArrowLeft,
-  Calendar,
-  Clock,
-  FileCheck,
-  ShieldCheck,
-  Percent,
+  Lock,
   Check,
-  X,
-  FileText
+  X
 } from 'lucide-react';
 
 interface StudentResultPageProps {
@@ -27,446 +25,366 @@ interface StudentResultPageProps {
   onBack: () => void;
 }
 
+interface ExamSummary {
+  id: string;
+  title: string;
+  description: string | null;
+  durationMinutes: number;
+  passPercentage: number;
+  negativeMarks: number;
+  resultsReleased: boolean;
+}
+
+const computeGrade = (percentage: number): { grade: string; remark: string } => {
+  if (percentage >= 90) return { grade: 'O', remark: 'Outstanding' };
+  if (percentage >= 80) return { grade: 'E', remark: 'Excellent' };
+  if (percentage >= 70) return { grade: 'A', remark: 'Very good' };
+  if (percentage >= 60) return { grade: 'B', remark: 'Good' };
+  if (percentage >= 40) return { grade: 'C', remark: 'Satisfactory' };
+  return { grade: 'F', remark: 'Not qualified' };
+};
+
 export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, onBack }) => {
   const { user } = useAuth();
+  const reducedMotion = usePrefersReducedMotion();
   const [result, setResult] = useState<Result | null>(null);
-  const [exam, setExam] = useState<any>(null);
+  const [exam, setExam] = useState<ExamSummary | null>(null);
   const [questionReview, setQuestionReview] = useState<Question[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasNoResults, setHasNoResults] = useState(false);
+
+  const fetchResultData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    setHasNoResults(false);
+
+    try {
+      let targetExamId = examId;
+      if (!targetExamId) {
+        const { data: latest } = await supabase
+          .from('results')
+          .select('exam_id')
+          .eq('user_id', user.id)
+          .order('evaluated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        targetExamId = latest?.exam_id;
+      }
+
+      if (!targetExamId) {
+        setHasNoResults(true);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: rpcError } = await supabase.rpc('get_result_review', {
+        p_exam_id: targetExamId
+      });
+      if (rpcError) throw rpcError;
+
+      setResult(data.result);
+      setExam(data.exam);
+      setQuestionReview(
+        data.questionReview
+          ? (data.questionReview as Question[]).map(q => ({
+              ...q,
+              isCandidateCorrect: q.selected_option_id === q.correctOptionId
+            }))
+          : null
+      );
+
+      // Celebrate a pass, but never for someone who asked for less motion.
+      // Loaded on demand so the confetti library stays out of the bundle
+      // for every other screen.
+      if (data.result?.status === 'pass' && data.exam?.resultsReleased && !reducedMotion) {
+        const { default: confetti } = await import('canvas-confetti');
+        confetti({ particleCount: 70, spread: 50, origin: { y: 0.6 }, disableForReducedMotion: true });
+      }
+    } catch (err) {
+      setError(describeError(err, 'This result could not be loaded.'));
+    } finally {
+      setLoading(false);
+    }
+  }, [examId, user, reducedMotion]);
 
   useEffect(() => {
-    const fetchResultData = async () => {
-      if (!user) return;
-      try {
-        setLoading(true);
-
-        let targetExamId = examId;
-        if (!targetExamId) {
-          const { data: latest } = await supabase
-            .from('results')
-            .select('exam_id')
-            .eq('user_id', user.id)
-            .order('evaluated_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          targetExamId = latest?.exam_id;
-        }
-
-        if (!targetExamId) {
-          setLoading(false);
-          return;
-        }
-
-        const { data, error: rpcError } = await supabase.rpc('get_result_review', {
-          p_exam_id: targetExamId
-        });
-        if (rpcError) throw rpcError;
-
-        setResult(data.result);
-        setExam(data.exam);
-        setQuestionReview(
-          (data.questionReview || []).map((q: Question) => ({
-            ...q,
-            isCandidateCorrect: q.selected_option_id === q.correctOptionId
-          }))
-        );
-
-        if (data.result && data.result.status === 'pass') {
-          confetti({
-            particleCount: 70,
-            spread: 50,
-            origin: { y: 0.6 }
-          });
-        }
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchResultData();
-  }, [examId, user?.id]);
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const computeGrade = (percentage: number): { grade: string; remark: string } => {
-    if (percentage >= 90) return { grade: 'O', remark: 'Outstanding' };
-    if (percentage >= 80) return { grade: 'E', remark: 'Excellent' };
-    if (percentage >= 70) return { grade: 'A', remark: 'Very Good' };
-    if (percentage >= 60) return { grade: 'B', remark: 'Good' };
-    if (percentage >= 40) return { grade: 'C', remark: 'Satisfactory' };
-    return { grade: 'F', remark: 'Fail' };
-  };
+  }, [fetchResultData]);
 
   if (loading) {
-    return <Spinner label="Compiling official provisional grade transcript..." />;
+    return <Spinner label="Loading your grade slip…" />;
+  }
+
+  if (hasNoResults) {
+    return (
+      <div className="card" style={{ maxWidth: '580px', margin: '3rem auto' }}>
+        <EmptyState
+          icon={<Award size={28} strokeWidth={1.5} />}
+          title="No results yet"
+          description="Grade slips appear here once you have submitted a paper and the Examination Cell has released its results."
+        />
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button onClick={onBack} className="btn btn-secondary">
+            <ArrowLeft size={15} aria-hidden="true" /> Back to dashboard
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (error || !result) {
     return (
-      <div className="card" style={{ maxWidth: '580px', margin: '3rem auto', textAlign: 'center', padding: '2rem' }}>
-        <Award size={32} color="var(--color-warning)" style={{ margin: '0 auto 0.75rem' }} />
-        <h2>Result Not Available</h2>
-        <p style={{ color: 'var(--text-secondary)', marginTop: '0.4rem', fontSize: '0.84rem' }}>
-          {error || 'This examination result is currently withheld pending official release by the Examination Cell.'}
-        </p>
-        <button onClick={onBack} className="btn btn-secondary" style={{ marginTop: '1.25rem' }}>
-          <ArrowLeft size={15} /> Return to Dashboard
-        </button>
+      <div className="card" style={{ maxWidth: '580px', margin: '3rem auto' }}>
+        <ErrorState
+          title="Result not available"
+          message={
+            error ||
+            'This result is currently withheld pending official release by the Examination Cell.'
+          }
+          onRetry={fetchResultData}
+        />
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button onClick={onBack} className="btn btn-secondary">
+            <ArrowLeft size={15} aria-hidden="true" /> Back to dashboard
+          </button>
+        </div>
       </div>
     );
   }
 
   const isPassed = result.status === 'pass';
-  const isReleased = exam?.resultsReleased !== false;
+  const isReleased = exam?.resultsReleased === true;
   const gradeInfo = computeGrade(result.percentage);
 
   return (
-    <div style={{ maxWidth: '920px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Top Action Bar */}
-      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ maxWidth: '920px', margin: '0 auto' }} className="section-stack">
+      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
         <button onClick={onBack} className="btn btn-secondary btn-sm">
-          <ArrowLeft size={15} /> Back to Dashboard
+          <ArrowLeft size={15} aria-hidden="true" /> Back to dashboard
         </button>
-        <button onClick={handlePrint} className="btn btn-primary btn-sm">
-          <Printer size={15} /> Print Grade Slip
-        </button>
+        {isReleased && (
+          <button onClick={() => window.print()} className="btn btn-primary btn-sm">
+            <Printer size={15} aria-hidden="true" /> Print grade slip
+          </button>
+        )}
       </div>
 
-      {/* Official Adamas University Provisional Grade Slip */}
-      <div className="card print-page animate-slide-up" style={{ padding: '2.5rem', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-prominent)' }}>
-        {/* University Header & Crest */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          borderBottom: '2px solid var(--border-prominent)',
-          paddingBottom: '1.25rem',
-          marginBottom: '1.75rem'
-        }}>
+      {/* Provisional results are visible to the candidate, but the fact that
+          they are not yet official must be unmissable. */}
+      {!isReleased && (
+        <div className="confirm-callout confirm-callout--info no-print" role="status">
+          <Lock size={15} style={{ flexShrink: 0, marginTop: '0.1rem' }} aria-hidden="true" />
+          <span>
+            <strong>Results not yet released.</strong> This is your provisional submission summary. The
+            per-question review and official grade slip become available once the Examination Cell
+            releases results for this paper.
+          </span>
+        </div>
+      )}
+
+      <div
+        className="card print-page animate-slide-up"
+        style={{ padding: '2.5rem', border: '1px solid var(--border-prominent)' }}
+      >
+        <header className="grade-slip__header">
           <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-action)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Office of the Controller of Examinations • Provisional Result
+            <div
+              style={{
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                color: 'var(--color-action-hover)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.07em'
+              }}
+            >
+              Office of the Controller of Examinations
             </div>
-            <h1 className="serif-title" style={{ fontSize: '1.75rem', color: 'var(--color-brand-primary)', marginTop: '0.2rem' }}>
-              ADAMAS UNIVERSITY
+            <h1 className="serif-title" style={{ fontSize: '1.65rem', marginTop: '0.25rem' }}>
+              Adamas University
             </h1>
             <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-              Department of Computer Science & Engineering • Academic Session 2026–2027
+              Department of Computer Science &amp; Engineering
             </div>
           </div>
 
           <div style={{ textAlign: 'right' }}>
-            <Badge type={isPassed ? 'pass' : 'fail'}>
-              {isPassed ? 'QUALIFIED / PASSED' : 'DID NOT QUALIFY'}
-            </Badge>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontFamily: 'var(--font-mono)' }}>
-              Transcript Ref: {result.result_id}
+            {isReleased ? (
+              <Badge type={isPassed ? 'pass' : 'fail'}>{isPassed ? 'Qualified' : 'Not qualified'}</Badge>
+            ) : (
+              <Badge type="completed">Provisional</Badge>
+            )}
+            <div
+              style={{
+                fontSize: '0.7rem',
+                color: 'var(--text-muted)',
+                marginTop: '0.45rem',
+                fontFamily: 'var(--font-mono)'
+              }}
+            >
+              Ref #{result.result_id.slice(0, 8).toUpperCase()}
             </div>
+          </div>
+        </header>
+
+        <div
+          className="meta-grid animate-slide-up stagger-1"
+          style={{
+            backgroundColor: 'var(--bg-surface-secondary)',
+            padding: '1rem',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--border-subtle)',
+            marginBottom: '2rem'
+          }}
+        >
+          <div>
+            <div className="meta-grid__label">Candidate</div>
+            <div className="meta-grid__value">{result.student_name || user?.name}</div>
+          </div>
+          {(result.roll_number || user?.rollNumber) && (
+            <div>
+              <div className="meta-grid__label">Roll number</div>
+              <div className="meta-grid__value" style={{ fontFamily: 'var(--font-mono)' }}>
+                {result.roll_number || user?.rollNumber}
+              </div>
+            </div>
+          )}
+          <div>
+            <div className="meta-grid__label">Examination</div>
+            <div className="meta-grid__value">{exam?.title || result.exam_title}</div>
+          </div>
+          <div>
+            <div className="meta-grid__label">Evaluated</div>
+            <div className="meta-grid__value">{formatDateTime(result.evaluated_at)}</div>
           </div>
         </div>
 
-        {/* Candidate & Assessment Metadata Box */}
-        <div className="animate-slide-up stagger-1" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: '0.75rem',
-          backgroundColor: 'var(--bg-surface-secondary)',
-          padding: '1rem',
-          borderRadius: 'var(--radius-sm)',
-          border: '1px solid var(--border-subtle)',
-          marginBottom: '2rem'
-        }}>
-          <div>
-            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Candidate Name:</span>
-            <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>{result.student_name || user?.name}</div>
-          </div>
-          <div>
-            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>University Roll No:</span>
-            <div style={{ fontWeight: 700, fontSize: '0.875rem', fontFamily: 'var(--font-mono)' }}>
-              {result.roll_number || user?.rollNumber || 'UG/SOET/30/24/043'}
+        {/* Performance summary */}
+        <div className="grade-summary">
+          <div className={`grade-summary__score ${isPassed ? 'is-pass' : 'is-fail'}`}>
+            <div className="grade-summary__label">Final percentage</div>
+            <div className="grade-summary__value">{result.percentage}%</div>
+            <div className="grade-summary__bar" aria-hidden="true">
+              <div className="grade-summary__bar-fill" style={{ width: `${Math.min(100, result.percentage)}%` }} />
             </div>
-          </div>
-          <div>
-            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Assessment Paper:</span>
-            <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>{exam?.title || result.exam_title}</div>
-          </div>
-          <div>
-            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Evaluation Timestamp:</span>
-            <div style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{new Date(result.evaluated_at).toLocaleString()}</div>
-          </div>
-        </div>
-
-        {/* Academic Performance Summary Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: '1rem',
-          marginBottom: '2.5rem'
-        }}>
-          {/* Percentage */}
-          <div style={{
-            padding: '1.25rem',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: isPassed ? 'var(--color-success-bg)' : 'var(--color-danger-bg)',
-            border: `1px solid ${isPassed ? 'var(--color-success-border)' : 'var(--color-danger-border)'}`,
-            textAlign: 'center',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 600, color: isPassed ? 'var(--color-success)' : 'var(--color-danger)' }}>
-              Final Percentage
-            </div>
-            <div style={{
-              fontSize: '2rem',
-              fontWeight: 700,
-              color: isPassed ? 'var(--color-success)' : 'var(--color-danger)',
-              lineHeight: 1.15,
-              marginTop: '0.2rem'
-            }}>
-              {result.percentage}%
-            </div>
-            <div style={{
-              width: '100%',
-              height: '4px',
-              backgroundColor: isPassed ? 'rgba(22, 163, 74, 0.15)' : 'rgba(220, 38, 38, 0.15)',
-              borderRadius: '2px',
-              margin: '0.5rem 0 0.4rem',
-              overflow: 'hidden'
-            }}>
-              <div
-                style={{
-                  height: '100%',
-                  width: `${result.percentage}%`,
-                  backgroundColor: isPassed ? 'var(--color-success)' : 'var(--color-danger)',
-                  borderRadius: '2px'
-                }}
-              />
-            </div>
-            <div style={{ fontSize: '0.72rem', color: isPassed ? 'var(--color-success)' : 'var(--color-danger)' }}>
-              Pass Mark: {exam?.passPercentage || 40}%
-            </div>
+            {typeof exam?.passPercentage === 'number' && (
+              <div className="grade-summary__foot">Pass mark: {exam.passPercentage}%</div>
+            )}
           </div>
 
-          {/* Letter Grade */}
-          <div className="card-interactive animate-pop-in stagger-1" style={{
-            padding: '1.25rem',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'var(--bg-surface-secondary)',
-            border: '1px solid var(--border-subtle)',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)' }}>
-              Assigned Grade
-            </div>
-            <div style={{
-              fontSize: '2.25rem',
-              fontWeight: 800,
-              color: 'var(--color-brand-primary)',
-              fontFamily: 'var(--font-heading)',
-              lineHeight: 1.15,
-              marginTop: '0.2rem'
-            }}>
-              {gradeInfo.grade}
-            </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-              {gradeInfo.remark}
-            </div>
+          <div className="grade-summary__tile">
+            <div className="grade-summary__label">Grade</div>
+            <div className="grade-summary__big">{gradeInfo.grade}</div>
+            <div className="grade-summary__foot">{gradeInfo.remark}</div>
           </div>
 
-          {/* Marks Obtained */}
-          <div className="card-interactive animate-pop-in stagger-2" style={{
-            padding: '1.25rem',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'var(--bg-surface-secondary)',
-            border: '1px solid var(--border-subtle)',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)' }}>
-              Marks Secured
+          <div className="grade-summary__tile">
+            <div className="grade-summary__label">Marks secured</div>
+            <div className="grade-summary__big">
+              {result.marks_obtained}
+              <span className="grade-summary__denominator">/ {result.total_marks}</span>
             </div>
-            <div style={{
-              fontSize: '2.25rem',
-              fontWeight: 800,
-              color: 'var(--color-brand-primary)',
-              fontFamily: 'var(--font-heading)',
-              lineHeight: 1.15,
-              marginTop: '0.2rem'
-            }}>
-              {result.marks_obtained} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>/ {result.total_marks}</span>
-            </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-              Total Weightage: {result.total_marks}
-            </div>
+            <div className="grade-summary__foot">{result.total_questions} questions</div>
           </div>
 
-          {/* Breakdown */}
-          <div className="card-interactive animate-pop-in stagger-3" style={{
-            padding: '1.25rem',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'var(--bg-surface-secondary)',
-            border: '1px solid var(--border-subtle)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            fontSize: '0.78rem'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="grade-summary__tile grade-summary__tile--breakdown">
+            <div className="detail-row">
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--color-success)' }}>
-                <CheckCircle2 size={14} /> Correct:
+                <CheckCircle2 size={14} aria-hidden="true" /> Correct
               </span>
               <strong>{result.correct_count}</strong>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div className="detail-row">
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--color-danger)' }}>
-                <XCircle size={14} /> Incorrect:
+                <XCircle size={14} aria-hidden="true" /> Incorrect
               </span>
               <strong>{result.incorrect_count}</strong>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div className="detail-row">
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-muted)' }}>
-                <HelpCircle size={14} /> Unanswered:
+                <HelpCircle size={14} aria-hidden="true" /> Unanswered
               </span>
               <strong>{result.unanswered_count}</strong>
             </div>
           </div>
         </div>
 
-        {/* Detailed Question Review (Only visible when results are released! REQ-47, SEC-08) */}
-        {isReleased && questionReview && (
-          <div>
-            <h3 style={{
-              fontSize: '1rem',
-              fontWeight: 700,
-              color: 'var(--color-brand-primary)',
-              marginBottom: '0.85rem',
-              borderBottom: '1px solid var(--border-subtle)',
-              paddingBottom: '0.45rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.03em'
-            }}>
-              Detailed Question-by-Question Evaluation Review
-            </h3>
+        {/* Per-question review — only ever present once results are released;
+            the RPC withholds the answer key entirely until then. */}
+        {isReleased && questionReview && questionReview.length > 0 && (
+          <section>
+            <h2 className="review-heading">Question-by-question review</h2>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div className="section-stack">
               {questionReview.map((q, idx) => {
                 const isCorrect = q.isCandidateCorrect;
-                const isAnswered = q.selected_option_id !== null && q.selected_option_id !== undefined;
+                const isAnswered = !!q.selected_option_id;
 
                 return (
-                  <div
+                  <article
                     key={q.question_id}
-                    style={{
-                      border: isCorrect ? '1px solid var(--color-success-border)' : (isAnswered ? '1px solid var(--color-danger-border)' : '1px solid var(--border-subtle)'),
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '1rem 1.15rem',
-                      backgroundColor: isCorrect ? 'var(--color-success-bg)' : (isAnswered ? 'var(--color-danger-bg)' : 'var(--bg-surface-secondary)')
-                    }}
+                    className={`review-card ${isCorrect ? 'is-correct' : isAnswered ? 'is-incorrect' : 'is-skipped'}`}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.45rem' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.84rem', color: 'var(--color-brand-primary)' }}>
-                        Q{idx + 1}. {q.question_text}
-                      </span>
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        padding: '0.15rem 0.45rem',
-                        borderRadius: '2px',
-                        backgroundColor: isCorrect ? 'var(--color-success-bg)' : (isAnswered ? 'var(--color-danger-bg)' : 'var(--bg-surface-muted)'),
-                        color: isCorrect ? 'var(--color-success)' : (isAnswered ? 'var(--color-danger)' : 'var(--text-muted)'),
-                        fontFamily: 'var(--font-mono)'
-                      }}>
-                        {isCorrect ? `+${q.marks} Marks` : '0 Marks'}
+                    <div className="review-card__head">
+                      <h3 className="review-card__question">
+                        <span className="review-card__index">Q{idx + 1}</span> {q.question_text}
+                      </h3>
+                      <span className="review-card__marks">
+                        {isCorrect ? `+${q.marks}` : '0'} marks
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
+                    <ul className="review-card__options">
                       {q.options.map((opt, optIdx) => {
                         const isChosen = q.selected_option_id === opt.option_id;
                         const isOptCorrect = opt.is_correct === true;
 
-                        let optBg = 'transparent';
-                        let optBorder = 'var(--border-subtle)';
-                        let icon = null;
-
-                        if (isOptCorrect) {
-                          optBg = 'var(--color-success-bg)';
-                          optBorder = 'var(--color-success-border)';
-                          icon = <Check size={13} color="var(--color-success)" />;
-                        } else if (isChosen && !isOptCorrect) {
-                          optBg = 'var(--color-danger-bg)';
-                          optBorder = 'var(--color-danger-border)';
-                          icon = <X size={13} color="var(--color-danger)" />;
-                        }
-
                         return (
-                          <div
+                          <li
                             key={opt.option_id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '0.45rem 0.75rem',
-                              borderRadius: '2px',
-                              border: `1px solid ${optBorder}`,
-                              backgroundColor: optBg,
-                              fontSize: '0.78rem'
-                            }}
+                            className={`review-option${isOptCorrect ? ' is-key' : ''}${isChosen && !isOptCorrect ? ' is-wrong' : ''}`}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                              <span style={{ fontWeight: 600 }}>{String.fromCharCode(65 + optIdx)}.</span>
-                              <span>{opt.option_text}</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              {isChosen && (
-                                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: isOptCorrect ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                                  (Candidate Choice)
-                                </span>
-                              )}
+                            <span className="review-option__text">
+                              <strong>{String.fromCharCode(65 + optIdx)}.</strong> {opt.option_text}
+                            </span>
+                            <span className="review-option__tags">
+                              {isChosen && <span className="review-option__tag">Your answer</span>}
                               {isOptCorrect && (
-                                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-success)' }}>
-                                  ✓ University Key
+                                <span className="review-option__tag is-key">
+                                  <Check size={11} aria-hidden="true" /> Correct
                                 </span>
                               )}
-                              {icon}
-                            </div>
-                          </div>
+                              {isChosen && !isOptCorrect && (
+                                <X size={13} color="var(--color-danger)" aria-hidden="true" />
+                              )}
+                            </span>
+                          </li>
                         );
                       })}
-                    </div>
-                  </div>
+                    </ul>
+                  </article>
                 );
               })}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Official Signature and Verification Block */}
-        <div style={{
-          marginTop: '2.5rem',
-          paddingTop: '1.25rem',
-          borderTop: '1px solid var(--border-prominent)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end',
-          fontSize: '0.72rem',
-          color: 'var(--text-muted)'
-        }}>
+        <footer className="grade-slip__footer">
           <div>
-            <div>Digitally certified by Adamas University OES Engine.</div>
-            <div>Institutional Cryptographic Hash: Verified.</div>
+            <div>Generated by the Adamas University Online Examination System.</div>
+            <div>
+              {isReleased
+                ? 'Officially released provisional result.'
+                : 'Provisional summary — not an official result.'}
+            </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ borderBottom: '1px solid var(--text-muted)', width: '160px', marginBottom: '0.35rem' }} />
-            <strong style={{ color: 'var(--color-brand-primary)' }}>Controller of Examinations</strong>
+            <div className="grade-slip__signature-line" aria-hidden="true" />
+            <strong style={{ color: 'var(--text-main)' }}>Controller of Examinations</strong>
             <div>Adamas University, Kolkata</div>
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   );
