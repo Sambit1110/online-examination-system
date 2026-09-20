@@ -41,7 +41,7 @@ class ImmediateResizeObserver {
   }
 }
 
-export type SceneVariant = 'hero' | 'ambient';
+export type SceneVariant = 'hero' | 'ambient' | 'admin';
 
 /* ------------------------------------------------------------------ */
 /* Motion                                                              */
@@ -214,6 +214,7 @@ const Shard: React.FC<{ position: [number, number, number]; scale: number }> = (
 
 const SceneContent: React.FC<{ variant: SceneVariant }> = ({ variant }) => {
   const hero = variant === 'hero';
+  const admin = variant === 'admin';
 
   return (
     <>
@@ -223,14 +224,26 @@ const SceneContent: React.FC<{ variant: SceneVariant }> = ({ variant }) => {
 
       {/* Key from above-front, a violet fill from below, and a cyan rim
           from behind to separate objects from the dark field. */}
-      <ambientLight intensity={0.55} color="#C3BCF7" />
-      <directionalLight position={[4, 6, 4]} intensity={1.15} color="#ffffff" />
-      <directionalLight position={[-4, -3, 2]} intensity={0.35} color="#8878F1" />
-      <pointLight position={[-4, 2, 1]} intensity={16} color="#6E5DE7" distance={12} decay={2} />
-      <pointLight position={[4.5, -1.5, 0.5]} intensity={11} color="#4FD1E0" distance={11} decay={2} />
+      <ambientLight intensity={admin ? 0.42 : 0.55} color={admin ? '#9FB4C7' : '#C3BCF7'} />
+      <directionalLight position={[4, 6, 4]} intensity={admin ? 0.95 : 1.15} color="#ffffff" />
+      <directionalLight position={[-4, -3, 2]} intensity={0.35} color={admin ? '#5C7A8F' : '#8878F1'} />
+      <pointLight
+        position={[-4, 2, 1]}
+        intensity={admin ? 10 : 16}
+        color={admin ? '#4FD1E0' : '#6E5DE7'}
+        distance={12}
+        decay={2}
+      />
+      <pointLight
+        position={[4.5, -1.5, 0.5]}
+        intensity={admin ? 9 : 11}
+        color={admin ? '#DFB369' : '#4FD1E0'}
+        distance={11}
+        decay={2}
+      />
 
-      <ParallaxRig strength={hero ? 0.16 : 0.09}>
-        <Dust count={hero ? 240 : 110} />
+      <ParallaxRig strength={hero ? 0.16 : admin ? 0.1 : 0.09}>
+        <Dust count={hero ? 240 : admin ? 170 : 110} />
 
         {/* Positioned toward the edges and pushed back in depth, well clear
             of the centred card. Each object bobs in place rather than
@@ -242,15 +255,29 @@ const SceneContent: React.FC<{ variant: SceneVariant }> = ({ variant }) => {
             3.6] at this depth. Everything is placed outside that band — the
             outer edges and the top/bottom strips — so the composition never
             has geometry sitting on top of type. */}
-        <Gem position={[-8.7, 2.5, -6.0]} scale={hero ? 0.78 : 0.58} />
-        <Ring position={[8.9, 2.0, -6.0]} scale={hero ? 0.7 : 0.52} />
-        <Shard position={[-8.3, -3.1, -5.6]} scale={hero ? 0.32 : 0.24} />
-
-        {hero && (
+        {admin ? (
+          /* The console reads as instrumentation: concentric rings and a
+             single gold seal, symmetrical and still, rather than the
+             candidate side's drifting paperwork. */
           <>
-            <Sheet position={[8.5, -3.3, -6.0]} rotation={[0.2, -0.42, 0.16]} color="#A99CF5" scale={0.55} />
-            <Sheet position={[-6.6, -5.4, -6.6]} rotation={[-0.16, 0.52, -0.12]} color="#79D8E4" scale={0.46} />
-            <Sheet position={[4.6, 5.1, -6.6]} rotation={[0.3, 0.2, -0.26]} color="#C3BCF7" scale={0.42} />
+            <Ring position={[-8.4, 2.2, -6.2]} scale={0.8} />
+            <Ring position={[8.6, -2.4, -6.4]} scale={0.62} />
+            <Shard position={[8.2, 3.4, -6.0]} scale={0.34} />
+            <Shard position={[-7.8, -3.8, -5.8]} scale={0.26} />
+          </>
+        ) : (
+          <>
+            <Gem position={[-8.7, 2.5, -6.0]} scale={hero ? 0.78 : 0.58} />
+            <Ring position={[8.9, 2.0, -6.0]} scale={hero ? 0.7 : 0.52} />
+            <Shard position={[-8.3, -3.1, -5.6]} scale={hero ? 0.32 : 0.24} />
+
+            {hero && (
+              <>
+                <Sheet position={[8.5, -3.3, -6.0]} rotation={[0.2, -0.42, 0.16]} color="#A99CF5" scale={0.55} />
+                <Sheet position={[-6.6, -5.4, -6.6]} rotation={[-0.16, 0.52, -0.12]} color="#79D8E4" scale={0.46} />
+                <Sheet position={[4.6, 5.1, -6.6]} rotation={[0.3, 0.2, -0.26]} color="#C3BCF7" scale={0.42} />
+              </>
+            )}
           </>
         )}
       </ParallaxRig>
@@ -260,7 +287,7 @@ const SceneContent: React.FC<{ variant: SceneVariant }> = ({ variant }) => {
 
 export const HeroScene: React.FC<{ variant?: SceneVariant }> = ({ variant = 'hero' }) => (
   <Canvas
-    dpr={[1, variant === 'hero' ? 1.5 : 1.25]}
+    dpr={[1, variant === 'ambient' ? 1.25 : 1.5]}
     gl={{ antialias: true, alpha: true, powerPreference: 'low-power' }}
     camera={{ position: [0, 0, 8], fov: 46 }}
     resize={{ polyfill: ImmediateResizeObserver as unknown as typeof ResizeObserver, debounce: 0 }}

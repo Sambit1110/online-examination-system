@@ -4002,3 +4002,244 @@ a:hover {
   background: linear-gradient(170deg, var(--color-action-subtle), rgba(110, 93, 231, 0.05));
   box-shadow: var(--shadow-inset-top), 0 0 0 1px var(--color-action-hover);
 }
+
+/* ==========================================================================
+   PORTAL IDENTITIES
+   Two genuinely different sign-in experiences that still read as one
+   product. The candidate portal keeps the house violet; the staff console
+   re-points the accent tokens to a cooler institutional steel so every
+   shared control — button, focus ring, icon chip — changes with it.
+   ========================================================================== */
+
+.auth-shell--admin {
+  --color-action: #2E8FA6;
+  --color-action-hover: #41A9C2;
+  --color-action-active: #24788C;
+  --color-action-subtle: rgba(46, 143, 166, 0.14);
+  --color-action-ring: rgba(46, 143, 166, 0.34);
+  --color-brand-secondary: #A9D6E2;
+  background-color: var(--bg-void);
+}
+
+/* A cooler, tighter atmosphere than the candidate side. */
+.auth-shell--admin::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 34rem at 50% -14%, rgba(46, 143, 166, 0.14), transparent 62%),
+    radial-gradient(48rem 30rem at 50% 118%, rgba(223, 179, 105, 0.06), transparent 62%);
+}
+
+/* ---- Admin: a single centred control panel ---- */
+
+.admin-auth {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 3rem 1.5rem;
+}
+
+.admin-auth__panel {
+  width: 100%;
+  max-width: 430px;
+  padding: 2rem 2rem 1.6rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-prominent);
+  background:
+    linear-gradient(170deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01) 44%),
+    rgba(10, 12, 18, 0.86);
+  backdrop-filter: blur(26px) saturate(1.25);
+  -webkit-backdrop-filter: blur(26px) saturate(1.25);
+  box-shadow: var(--shadow-inset-strong), var(--shadow-xl);
+  animation: authRise 0.6s var(--ease-entrance) both;
+}
+
+/* Monospace restricted strip — the console's own voice, not the campus's. */
+.admin-auth__restricted {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+  background-color: var(--color-gold-bg);
+  border: 1px solid var(--color-gold-border);
+  border-radius: var(--radius-xs);
+  padding: 0.25rem 0.55rem;
+  margin-bottom: 1.35rem;
+}
+
+.admin-auth__head {
+  text-align: left;
+}
+
+/* .eyebrow is an inline span by default, which would sit alongside the
+   crest instead of beneath it. */
+.admin-auth__head .eyebrow {
+  display: block;
+}
+
+.admin-auth__crest {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-brand-secondary);
+  background: linear-gradient(160deg, rgba(46, 143, 166, 0.3), rgba(46, 143, 166, 0.08));
+  border: 1px solid var(--color-action-ring);
+  box-shadow: var(--shadow-inset-top);
+  margin-bottom: 0.9rem;
+}
+
+.admin-auth__title {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--text-main);
+  letter-spacing: var(--tracking-tight);
+  margin-top: 0.2rem;
+}
+
+.admin-auth__sub {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+  line-height: var(--leading-normal);
+}
+
+/* Gold institutional hairline separating identity from credentials. */
+.admin-auth__rule {
+  height: 1px;
+  margin: 1.35rem 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-gold-border) 18%,
+    rgba(223, 179, 105, 0.55) 50%,
+    var(--color-gold-border) 82%,
+    transparent
+  );
+}
+
+.admin-auth__scope {
+  margin-top: 1.5rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.admin-auth__scope-label {
+  display: block;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-faint);
+  margin-bottom: 0.55rem;
+}
+
+.admin-auth__scope-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-auth__scope-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--text-2xs);
+  color: var(--text-secondary);
+  background-color: var(--bg-surface-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
+.admin-auth__scope-list svg {
+  color: var(--text-muted);
+}
+
+.admin-auth__notice {
+  margin-top: 1.1rem;
+  font-size: var(--text-2xs);
+  color: var(--text-faint);
+  line-height: var(--leading-normal);
+}
+
+/* ---- Cross-portal link, shared by both pages ---- */
+
+.auth-crosslink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 1.1rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.auth-crosslink:hover {
+  color: var(--text-main);
+  background-color: rgba(255, 255, 255, 0.035);
+  border-color: var(--border-subtle);
+}
+
+/* ---- Wrong-portal denial ---- */
+
+.auth-alert--denied {
+  background-color: var(--color-accent-indigo-bg);
+  border-color: var(--color-accent-indigo-border);
+  color: var(--color-brand-secondary);
+}
+
+.auth-alert__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.auth-alert__action:hover {
+  opacity: 0.8;
+}
+
+@media (max-width: 640px) {
+  .admin-auth {
+    padding: 2rem 1.25rem;
+  }
+  .admin-auth__panel {
+    padding: 1.5rem 1.25rem 1.25rem;
+  }
+}

@@ -15,7 +15,11 @@ export type LoginFailureKind =
   | 'configuration'
   | 'network'
   | 'rate_limit'
-  | 'unconfirmed';
+  | 'unconfirmed'
+  | 'role';
+
+/** The portal a sign-in attempt was made through. */
+export type PortalRole = 'student' | 'admin';
 
 export interface LoginResult {
   success: boolean;
@@ -34,7 +38,13 @@ interface AuthContextType {
    * same dead end.
    */
   profileError: string | null;
-  login: (identifier: string, pass: string) => Promise<LoginResult>;
+  login: (identifier: string, pass: string, expectedRole: PortalRole) => Promise<LoginResult>;
+  /**
+   * True while a sign-in is mid role-verification. The auth listener fires
+   * as soon as Supabase accepts the password, so without this the app would
+   * flash the dashboard for a moment before a wrong-portal sign-in is undone.
+   */
+  portalCheckPending: boolean;
   logout: () => void;
   isAdmin: boolean;
   isStudent: boolean;
@@ -78,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [portalCheckPending, setPortalCheckPending] = useState(false);
 
   useEffect(() => {
     // Without credentials every call would fail against a placeholder host;
@@ -134,7 +145,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (identifier: string, password: string): Promise<LoginResult> => {
+  const login = async (
+    identifier: string,
+    password: string,
+    expectedRole: PortalRole
+  ): Promise<LoginResult> => {
     if (!isSupabaseConfigured) {
       return {
         success: false,
@@ -189,12 +204,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      setPortalCheckPending(true);
+
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({
         email: resolvedEmail as string,
         password
       });
 
       if (error) {
+        setPortalCheckPending(false);
         const code = (error as { code?: string }).code || '';
         const message = error.message || '';
 
@@ -228,8 +246,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, kind: 'credentials', error: 'Incorrect email or password.' };
       }
 
+      // ------------------------------------------------------------------
+      // Portal authorisation.
+      //
+      // The password was correct, so the caller is who they say they are —
+      // but that does not mean they may use *this* portal. The role is read
+      // back from the profiles table under RLS (a session may only read its
+      // own row), never from anything the client supplied. A mismatch ends
+      // the session immediately rather than leaving a half-signed-in state.
+      // ------------------------------------------------------------------
+      const signedInId = signInData.user?.id;
+      const { data: profileRow, error: roleError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', signedInId)
+        .single();
+
+      if (roleError || !profileRow) {
+        await supabase.auth.signOut();
+        setPortalCheckPending(false);
+        return {
+          success: false,
+          kind: 'configuration',
+          error:
+            'Signed in, but your portal profile could not be read, so access could not be authorised. Please contact the Examination Cell.'
+        };
+      }
+
+      const actualRole = profileRow.role as PortalRole;
+      if (actualRole !== expectedRole) {
+        await supabase.auth.signOut();
+        setPortalCheckPending(false);
+        return {
+          success: false,
+          kind: 'role',
+          error:
+            expectedRole === 'student'
+              ? 'This account belongs to an administrator. Please use Admin Login.'
+              : 'This account is not authorized for administrator access.'
+        };
+      }
+
+      setPortalCheckPending(false);
       return { success: true };
     } catch (err) {
+      setPortalCheckPending(false);
       // A thrown error here is a transport failure — DNS, CORS, offline, or
       // a URL pointing at a project that no longer exists.
       return {
@@ -254,6 +315,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         loading,
         profileError,
+        portalCheckPending,
         login,
         logout,
         isAdmin: user?.role === 'admin',

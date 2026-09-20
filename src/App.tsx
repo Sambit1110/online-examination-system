@@ -1,8 +1,10 @@
-import React, { Suspense, lazy, useCallback, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { useAuth } from './context/AuthContext';
+import { useRoute, ROUTES } from './hooks/useRoute';
 import { Navbar } from './components/common/Navbar';
 import { AdminRail } from './components/common/AdminRail';
-import { LoginPage } from './pages/auth/LoginPage';
+import { StudentLoginPage } from './pages/auth/StudentLoginPage';
+import { AdminLoginPage } from './pages/auth/AdminLoginPage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
 import { ExamInstructionsPage } from './pages/student/ExamInstructionsPage';
 import { ExamInterfacePage } from './pages/student/ExamInterfacePage';
@@ -34,9 +36,30 @@ const SystemBackupPage = lazy(() =>
 );
 
 export const App: React.FC = () => {
-  const { user, loading, profileError, logout, isAdmin, isStudent } = useAuth();
+  const { user, loading, profileError, portalCheckPending, logout, isAdmin, isStudent } = useAuth();
+  const { path, navigate: go } = useRoute();
   const [currentView, setCurrentView] = useState<string>('default');
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
+
+  const onLoginRoute = path === ROUTES.studentLogin || path === ROUTES.adminLogin;
+
+  // Keep the URL and the session honest about each other. A signed-in user
+  // sitting on a login route is sent to their own portal; a signed-out user
+  // anywhere else is sent to the login page that matches where they were
+  // trying to go. Role still comes from the authenticated profile, never
+  // from the URL — this only decides which screen to show.
+  useEffect(() => {
+    if (loading || portalCheckPending) return;
+
+    if (user) {
+      if (onLoginRoute) go(ROUTES.app, true);
+      return;
+    }
+
+    if (!onLoginRoute) {
+      go(ROUTES.studentLogin, true);
+    }
+  }, [user, loading, portalCheckPending, onLoginRoute, go]);
 
   const navigate = useCallback((view: string) => {
     setSelectedExamId(null);
@@ -64,7 +87,7 @@ export const App: React.FC = () => {
     );
   }
 
-  if (loading) {
+  if (loading || portalCheckPending) {
     return (
       <div className="boot-screen" role="status" aria-live="polite">
         <div className="spinner spinner-lg" aria-hidden="true" />
@@ -90,8 +113,32 @@ export const App: React.FC = () => {
     );
   }
 
+  // Signed out: only the two portals are reachable. The redirect effect
+  // above normalises anything else to the student portal.
   if (!user) {
-    return <LoginPage />;
+    return path === ROUTES.adminLogin ? (
+      <AdminLoginPage onNavigate={go} />
+    ) : (
+      <StudentLoginPage onNavigate={go} />
+    );
+  }
+
+  // Signed in but the role is neither of the two the product supports —
+  // refuse rather than rendering an empty shell.
+  if (!isAdmin && !isStudent) {
+    return (
+      <div className="crash-screen">
+        <div className="crash-screen__card card">
+          <ErrorState
+            title="Access denied"
+            message="This account does not carry a student or administrator role, so no portal can be opened for it."
+          />
+          <button type="button" className="btn btn-secondary" onClick={logout}>
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Active examination mode: dedicated full-screen chrome, no portal nav.
