@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useCallback, useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import { Navbar } from './components/common/Navbar';
+import { AdminRail } from './components/common/AdminRail';
 import { LoginPage } from './pages/auth/LoginPage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
 import { ExamInstructionsPage } from './pages/student/ExamInstructionsPage';
@@ -107,6 +108,36 @@ export const App: React.FC = () => {
     );
   }
 
+  // The console has a fixed set of destinations an operator moves between
+  // constantly, so it gets a persistent rail. Candidates have two, so they
+  // get a top bar and the full width of the screen.
+  if (isAdmin) {
+    return (
+      <div className="console-shell">
+        <a className="skip-link" href="#main-content">
+          Skip to main content
+        </a>
+
+        <AdminRail currentView={currentView} setCurrentView={navigate} />
+
+        <main className="console-content" id="main-content" tabIndex={-1}>
+          <div className="console-content__inner">
+            <Suspense fallback={<Spinner label="Loading console…" size="lg" />}>
+              {(currentView === 'default' || currentView === 'admin-dashboard') && (
+                <AdminDashboard onNavigate={navigate} />
+              )}
+              {currentView === 'admin-questions' && <QuestionBankPage />}
+              {currentView === 'admin-exams' && <ExamManagementPage />}
+              {currentView === 'admin-results' && <AdminResultsPage />}
+              {currentView === 'admin-users' && <UserManagementPage />}
+              {currentView === 'admin-backup' && <SystemBackupPage />}
+            </Suspense>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       <a className="skip-link" href="#main-content">
@@ -114,7 +145,7 @@ export const App: React.FC = () => {
       </a>
 
       <Navbar
-        currentView={currentView === 'default' ? (isAdmin ? 'admin-dashboard' : 'student-dashboard') : currentView}
+        currentView={currentView === 'default' ? 'student-dashboard' : currentView}
         setCurrentView={navigate}
       />
 
@@ -153,18 +184,6 @@ export const App: React.FC = () => {
           </>
         )}
 
-        {isAdmin && (
-          <Suspense fallback={<Spinner label="Loading console…" size="lg" />}>
-            {(currentView === 'default' || currentView === 'admin-dashboard') && (
-              <AdminDashboard onNavigate={navigate} />
-            )}
-            {currentView === 'admin-questions' && <QuestionBankPage />}
-            {currentView === 'admin-exams' && <ExamManagementPage />}
-            {currentView === 'admin-results' && <AdminResultsPage />}
-            {currentView === 'admin-users' && <UserManagementPage />}
-            {currentView === 'admin-backup' && <SystemBackupPage />}
-          </Suspense>
-        )}
       </main>
 
       <Footer />

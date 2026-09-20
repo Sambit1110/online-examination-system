@@ -7,6 +7,7 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { ErrorBanner } from '../../components/common/ErrorState';
 import { SkeletonCards } from '../../components/common/Skeleton';
 import { TiltCard } from '../../components/common/TiltCard';
+import { HeroBackground } from '../../components/three/HeroBackground';
 import { formatDateTime, formatRelative, describeError } from '../../lib/format';
 import {
   Clock,
@@ -41,6 +42,10 @@ const computeAccessState = (
   if (now > new Date(exam.end_time)) return { accessState: 'expired', canStart: false };
   return { accessState: 'live', canStart: true };
 };
+
+/** Derived from the device clock — not fabricated data. */
+const greetingFor = (hour: number) =>
+  hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
 /** Short, human-quotable reference derived from the real exam id. */
 const shortRef = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
@@ -126,6 +131,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
   const upcomingExams = exams.filter(e => e.accessState === 'upcoming');
   const completedExams = exams.filter(e => e.accessState === 'completed');
 
+  const greeting = greetingFor(new Date().getHours());
   const completedWithScores = completedExams.filter(e => typeof e.percentage === 'number');
   const avgScore =
     completedWithScores.length > 0
@@ -137,48 +143,42 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
 
   return (
     <div className="page-stack">
-      {/* Candidate banner */}
-      <div className="glass-panel page-banner animate-slide-up">
-        <div>
-          <div className="page-banner__eyebrow">Candidate dashboard</div>
-          <h1 className="page-banner__title">{user?.name}</h1>
-          <div className="page-banner__desc" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            {user?.rollNumber && (
-              <span>
-                Roll:{' '}
-                <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
-                  {user.rollNumber}
-                </strong>
-              </span>
-            )}
-            {user?.department && (
-              <>
-                {user?.rollNumber && <span aria-hidden="true">•</span>}
-                <span>{user.department}</span>
-              </>
-            )}
-          </div>
-        </div>
+      {/* Candidate hero */}
+      <header className="student-hero">
+        <HeroBackground variant="ambient" className="student-hero__canvas" />
 
-        <div className="metric-strip">
-          <div className="metric-chip">
-            <div className="metric-chip__label">Active</div>
-            <div className="metric-chip__value" style={{ color: 'var(--color-success)' }}>
-              {loading ? '—' : liveExams.length}
+        <div className="student-hero__body">
+          <div className="student-hero__identity">
+            <span className="eyebrow">{greeting}</span>
+            <h1 className="serif-title student-hero__name">{user?.name}</h1>
+            <div className="student-hero__meta">
+              {user?.rollNumber && (
+                <span className="student-hero__roll">{user.rollNumber}</span>
+              )}
+              {user?.department && <span>{user.department}</span>}
             </div>
           </div>
-          <div className="metric-chip">
-            <div className="metric-chip__label">Completed</div>
-            <div className="metric-chip__value">{loading ? '—' : completedExams.length}</div>
-          </div>
-          <div className="metric-chip">
-            <div className="metric-chip__label">Average</div>
-            <div className="metric-chip__value" style={{ color: 'var(--color-action-hover)' }}>
-              {loading || avgScore === null ? '—' : `${avgScore}%`}
+
+          <dl className="metric-strip">
+            <div className="metric-chip">
+              <dt className="metric-chip__label">Open now</dt>
+              <dd className="metric-chip__value" style={{ color: 'var(--color-success)' }}>
+                {loading ? '—' : liveExams.length}
+              </dd>
             </div>
-          </div>
+            <div className="metric-chip">
+              <dt className="metric-chip__label">Completed</dt>
+              <dd className="metric-chip__value">{loading ? '—' : completedExams.length}</dd>
+            </div>
+            <div className="metric-chip">
+              <dt className="metric-chip__label">Average</dt>
+              <dd className="metric-chip__value" style={{ color: 'var(--color-gold)' }}>
+                {loading || avgScore === null ? '—' : `${avgScore}%`}
+              </dd>
+            </div>
+          </dl>
         </div>
-      </div>
+      </header>
 
       {error && <ErrorBanner message={error} onRetry={fetchExams} />}
 

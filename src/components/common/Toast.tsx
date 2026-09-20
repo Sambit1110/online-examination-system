@@ -56,7 +56,7 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismis
               boxShadow: 'var(--shadow-md)',
               fontSize: '0.875rem',
               color: 'var(--text-main)',
-              animation: 'toastSlidePop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both'
+              animation: 'toastSlidePop 0.26s cubic-bezier(0.22, 1, 0.36, 1) both'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

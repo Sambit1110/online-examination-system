@@ -47,7 +47,7 @@ export const TiltCard: React.FC<TiltCardProps> = ({
 
   const handleMouseLeave = useCallback(() => {
     if (!cardRef.current) return;
-    cardRef.current.style.transition = 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
+    cardRef.current.style.transition = 'transform 0.55s cubic-bezier(0.22, 1, 0.36, 1)';
     cardRef.current.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
   }, []);
 

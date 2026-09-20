@@ -1,7 +1,27 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { describeError } from '../lib/format';
 import { User } from '../types';
+
+/**
+ * Why a sign-in attempt failed. The distinction matters: a misapplied
+ * migration or a bad deployment key is an operations problem, and telling
+ * the user "invalid password" for it sends them off to reset a password
+ * that was never wrong.
+ */
+export type LoginFailureKind =
+  | 'credentials'
+  | 'configuration'
+  | 'network'
+  | 'rate_limit'
+  | 'unconfirmed';
+
+export interface LoginResult {
+  success: boolean;
+  error?: string;
+  kind?: LoginFailureKind;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -14,7 +34,7 @@ interface AuthContextType {
    * same dead end.
    */
   profileError: string | null;
-  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  login: (identifier: string, pass: string) => Promise<LoginResult>;
   logout: () => void;
   isAdmin: boolean;
   isStudent: boolean;
@@ -114,29 +134,109 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (identifier: string, password: string) => {
+  const login = async (identifier: string, password: string): Promise<LoginResult> => {
+    if (!isSupabaseConfigured) {
+      return {
+        success: false,
+        kind: 'configuration',
+        error:
+          'This deployment is missing its Supabase credentials, so sign-in cannot run. This is a configuration problem, not a password problem.'
+      };
+    }
+
+    const trimmed = identifier.trim();
+    const looksLikeEmail = trimmed.includes('@');
+
     try {
-      // Students may sign in with either their email or roll number.
+      // Students may sign in with either their email or roll number, so the
+      // identifier is resolved to an email first.
       const { data: resolvedEmail, error: resolveError } = await supabase.rpc('resolve_login_email', {
-        p_identifier: identifier.trim()
+        p_identifier: trimmed
       });
 
-      if (resolveError || !resolvedEmail) {
-        return { success: false, error: 'Invalid email/roll number or password.' };
+      if (resolveError) {
+        // PGRST202 = no such function; 42883 = undefined_function. Both mean
+        // the login migration has not been applied to this database, which
+        // is an operations problem and must not be reported as a bad password.
+        const code = (resolveError as { code?: string }).code;
+        if (code === 'PGRST202' || code === '42883') {
+          return {
+            success: false,
+            kind: 'configuration',
+            error:
+              'The sign-in service is unavailable: the database is missing the resolve_login_email function. Apply the migrations in supabase/migrations/ and try again.'
+          };
+        }
+        return {
+          success: false,
+          kind: 'configuration',
+          error: `The sign-in service could not be reached (${describeError(resolveError, 'unknown error')}).`
+        };
+      }
+
+      if (!resolvedEmail) {
+        // The identifier resolved to nothing. For an email this cannot
+        // happen (it passes straight through), so this is always a roll
+        // number we could not map — historically because profiles.email was
+        // never backfilled. Point at the workaround without confirming
+        // whether the roll number exists.
+        return {
+          success: false,
+          kind: 'credentials',
+          error: looksLikeEmail
+            ? 'Incorrect email or password.'
+            : 'We could not sign you in with that roll number. Please try your university email address instead.'
+        };
       }
 
       const { error } = await supabase.auth.signInWithPassword({
-        email: resolvedEmail,
+        email: resolvedEmail as string,
         password
       });
 
       if (error) {
-        return { success: false, error: 'Invalid email/roll number or password.' };
+        const code = (error as { code?: string }).code || '';
+        const message = error.message || '';
+
+        if (code === 'email_not_confirmed' || /not confirmed/i.test(message)) {
+          return {
+            success: false,
+            kind: 'unconfirmed',
+            error:
+              'This account’s email address has not been confirmed yet. Ask the Examination Cell to confirm it before signing in.'
+          };
+        }
+
+        if (error.status === 429 || /rate limit/i.test(message)) {
+          return {
+            success: false,
+            kind: 'rate_limit',
+            error: 'Too many sign-in attempts. Please wait a moment and try again.'
+          };
+        }
+
+        // Anything that is not a recognised auth rejection is far more
+        // likely to be a broken deployment than a wrong password.
+        if (error.status && error.status >= 500) {
+          return {
+            success: false,
+            kind: 'configuration',
+            error: `The authentication service returned an error (${error.status}). This is a server-side problem, not your password.`
+          };
+        }
+
+        return { success: false, kind: 'credentials', error: 'Incorrect email or password.' };
       }
 
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Network connection failed' };
+    } catch (err) {
+      // A thrown error here is a transport failure — DNS, CORS, offline, or
+      // a URL pointing at a project that no longer exists.
+      return {
+        success: false,
+        kind: 'network',
+        error: `Could not reach the authentication service. Check your connection and that the portal is configured correctly (${describeError(err, 'network error')}).`
+      };
     }
   };
 

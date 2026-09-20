@@ -397,7 +397,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                           <div className="progress-track" style={{ flex: 1 }}>
                             <div
                               className="progress-fill"
-                              style={{ width: `${progressPct}%`, background: 'var(--color-success)' }}
+                              style={
+                                {
+                                  '--fill': progressPct / 100,
+                                  background: 'var(--color-success)'
+                                } as React.CSSProperties
+                              }
                             />
                           </div>
                           <span

@@ -605,15 +605,17 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({ examId, on
       <div className="progress-track exam-progress-rail">
         <div
           className="progress-fill"
-          style={{
-            width: `${timeElapsedPct}%`,
-            borderRadius: 0,
-            background: isTimeCritical
-              ? 'var(--color-danger)'
-              : isTimeWarning
-                ? 'var(--color-warning)'
-                : 'var(--color-action)'
-          }}
+          style={
+            {
+              '--fill': timeElapsedPct / 100,
+              borderRadius: 0,
+              background: isTimeCritical
+                ? 'var(--color-danger)'
+                : isTimeWarning
+                  ? 'var(--color-warning)'
+                  : 'var(--color-action)'
+            } as React.CSSProperties
+          }
         />
       </div>
 
@@ -643,7 +645,9 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({ examId, on
               <div className="progress-track" style={{ flex: 1 }}>
                 <div
                   className="progress-fill"
-                  style={{ width: `${answeredPct}%`, background: 'var(--color-success)' }}
+                  style={
+                    { '--fill': answeredPct / 100, background: 'var(--color-success)' } as React.CSSProperties
+                  }
                 />
               </div>
               <span className="exam-answered-rail__count">
