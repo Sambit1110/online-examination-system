@@ -10,6 +10,7 @@ import examsRouter from './routes/exams.js';
 import conductRouter from './routes/conduct.js';
 import resultsRouter from './routes/results.js';
 import adminRouter from './routes/admin.js';
+import { isDatabaseEmpty } from './db/database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,12 @@ app.use((err, req, res, next) => {
 const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule && !process.env.VERCEL) {
+  // database.js has finished loading by now, so seed.js (which imports it
+  // and seeds as soon as it is loaded) can no longer deadlock against it.
+  if (isDatabaseEmpty()) {
+    await import('./db/seed.js');
+  }
+
   app.listen(PORT, () => {
     console.log(`=== Adamas University Online Examination System Backend ===`);
     console.log(`Server running securely on http://localhost:${PORT}`);

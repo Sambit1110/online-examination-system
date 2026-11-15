@@ -47,16 +47,18 @@ try {
   console.warn('Schema check notice:', err);
 }
 
-// Auto-seed if tables are empty
-try {
-  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
-  if (!userCount || userCount.count === 0) {
-    const { seedDatabase } = await import('./seed.js');
-    seedDatabase();
+// Auto-seeding an empty database lives in server/index.js, not here:
+// seed.js imports this module, so awaiting seed.js from this module's own
+// top level made each wait on the other and Node exited (code 13) on an
+// empty database.
+export const isDatabaseEmpty = () => {
+  try {
+    const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+    return !userCount || userCount.count === 0;
+  } catch {
+    return false;
   }
-} catch (err) {
-  // users table might be empty or being initialized
-}
+};
 
 // Helper wrapper functions
 export const queryAll = (sql, params = []) => {

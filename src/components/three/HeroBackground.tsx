@@ -11,15 +11,45 @@ interface HeroBackgroundProps {
   className?: string;
 }
 
+interface NetworkInformationLike {
+  saveData?: boolean;
+  effectiveType?: string;
+}
+
+/**
+ * The 3D chunk is ~800 kB (≈220 kB gzipped). On a slow or metered link
+ * that is bandwidth the login request itself needs, so it is skipped.
+ */
+const isConstrainedNetwork = (): boolean => {
+  const connection = (navigator as Navigator & { connection?: NetworkInformationLike }).connection;
+  if (!connection) return false;
+  if (connection.saveData) return true;
+  return connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g' || connection.effectiveType === '3g';
+};
+
+/** Runs `callback` once the browser is idle, so the 3D download never competes with the page's own first paint. */
+const whenIdle = (callback: () => void): (() => void) => {
+  if ('requestIdleCallback' in window) {
+    const id = window.requestIdleCallback(callback, { timeout: 2500 });
+    return () => window.cancelIdleCallback(id);
+  }
+  // `globalThis`, not `window`: after the `in` check above TypeScript
+  // narrows `window` to `never` on this branch.
+  const id = globalThis.setTimeout(callback, 600);
+  return () => globalThis.clearTimeout(id);
+};
+
 /**
  * Ambient 3D layer. Purely decorative (`pointer-events: none`,
  * `aria-hidden`), so it can never interfere with a form or a screen reader.
  *
- * Three gates before any WebGL is downloaded:
+ * Five gates before any WebGL is downloaded:
  *  - the user has not asked for reduced motion,
  *  - the device is not a small viewport (CSS hides the layer there anyway,
  *    so downloading three.js for it would be pure waste),
- *  - the layer has actually scrolled into view.
+ *  - the connection is not slow or in data-saver mode,
+ *  - the layer has actually scrolled into view,
+ *  - the browser is idle (the form is already usable).
  */
 export const HeroBackground: React.FC<HeroBackgroundProps> = ({ variant = 'hero', className }) => {
   const reducedMotion = usePrefersReducedMotion();
@@ -31,26 +61,35 @@ export const HeroBackground: React.FC<HeroBackgroundProps> = ({ variant = 'hero'
 
     // Matches the `display: none` breakpoint on .hero-canvas-layer.
     if (window.matchMedia('(max-width: 640px)').matches) return;
+    if (isConstrainedNetwork()) return;
 
     const node = hostRef.current;
     if (!node) return;
 
+    let cancelIdle: (() => void) | null = null;
+    const renderWhenIdle = () => {
+      cancelIdle = whenIdle(() => setShouldRender(true));
+    };
+
     if (!('IntersectionObserver' in window)) {
-      setShouldRender(true);
-      return;
+      renderWhenIdle();
+      return () => cancelIdle?.();
     }
 
     const observer = new IntersectionObserver(
       entries => {
         if (entries.some(e => e.isIntersecting)) {
-          setShouldRender(true);
           observer.disconnect();
+          renderWhenIdle();
         }
       },
       { rootMargin: '120px' }
     );
     observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      cancelIdle?.();
+    };
   }, [reducedMotion]);
 
   if (reducedMotion) return null;

@@ -46,6 +46,11 @@ and which dev command you run — the two modes don't interfere with each other.
 - Role-based access control — students can never reach admin functionality
 - Timed exams with question navigation, mark-for-review, and resilient
   autosave (queued, retried with backoff, and flushed before submission)
+- The time limit is enforced by the database, not just the on-screen timer:
+  answers sent after the deadline are rejected and late submissions are
+  recorded as timed out
+- Question order is shuffled per student (and stays the same when they reload)
+- Scores stay hidden from students until the administrator releases results
 - Tab/window focus integrity monitoring during exams (see below) — no
   webcam, microphone, or screen recording of any kind
 - Automatic, tamper-proof grading — correct answers are never sent to the
@@ -138,6 +143,14 @@ four files, in order (or use the Supabase CLI — see below):
 2. `supabase/migrations/0002_rls.sql` — Row Level Security policies
 3. `supabase/migrations/0003_functions.sql` — grading/attempt RPC functions
 4. `supabase/migrations/0004_login_identifier.sql` — login-by-roll-number support
+5. `supabase/migrations/0005_fix_login_email_resolution.sql` — roll-number login repair
+6. `supabase/migrations/0006_exam_integrity_hardening.sql` — server-enforced time
+   limit, no direct student writes, draft exams un-startable, scores withheld
+   until release, per-student question order
+
+Or paste `supabase/apply_all_migrations.sql` (all six, in order) in one go.
+**Upgrading an existing project?** Run only the migrations it doesn't have yet;
+every migration is safe to re-run.
 
 Using the CLI instead:
 ```bash
@@ -230,6 +243,14 @@ table has Row Level Security enabled; students only ever see their own
 attempts/answers/results, and never see `is_correct` on an option directly —
 that's only ever returned by the grading/review RPC functions, and only
 after results are released.
+
+Students have **no direct write access** to `exam_attempts` or
+`submitted_answers`: every change goes through `start_exam_attempt`,
+`save_answer` and `submit_exam_attempt`, which check ownership, the deadline
+(start time + duration, with a 30-second grace for network latency) and that
+the question belongs to the exam. A student's own `results` row is readable
+only once the exam's results are released; before that the RPCs return a
+submission summary with every score field set to `null`.
 
 ---
 

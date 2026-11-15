@@ -63,11 +63,15 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
     try {
       let targetExamId = examId;
       if (!targetExamId) {
+        // Read from attempts, not results: a student's result row is only
+        // visible to them once results are released, but their latest
+        // submission should still open here as a provisional summary.
         const { data: latest } = await supabase
-          .from('results')
+          .from('exam_attempts')
           .select('exam_id')
           .eq('user_id', user.id)
-          .order('evaluated_at', { ascending: false })
+          .in('status', ['submitted', 'timed_out'])
+          .order('submitted_at', { ascending: false, nullsFirst: false })
           .limit(1)
           .maybeSingle();
         targetExamId = latest?.exam_id;
@@ -156,7 +160,10 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
 
   const isPassed = result.status === 'pass';
   const isReleased = exam?.resultsReleased === true;
-  const gradeInfo = computeGrade(result.percentage);
+  // Before release the server withholds every score field (they arrive as
+  // null), so a grade is only computed once results are official.
+  const gradeInfo = isReleased ? computeGrade(result.percentage) : null;
+  const answeredCount = Math.max(0, result.total_questions - result.unanswered_count);
 
   return (
     <div style={{ maxWidth: '920px', margin: '0 auto' }} className="section-stack">
@@ -260,7 +267,30 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
           </div>
         </div>
 
+        {/* Before release: confirm what was submitted, never the score. */}
+        {!isReleased && (
+          <div className="grade-summary">
+            <div className="grade-summary__tile">
+              <div className="grade-summary__label">Questions answered</div>
+              <div className="grade-summary__big">
+                {answeredCount}
+                <span className="grade-summary__denominator">/ {result.total_questions}</span>
+              </div>
+              <div className="grade-summary__foot">{result.unanswered_count} left unanswered</div>
+            </div>
+
+            <div className="grade-summary__tile">
+              <div className="grade-summary__label">Marks secured</div>
+              <div className="grade-summary__big" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Lock size={22} aria-hidden="true" /> Withheld
+              </div>
+              <div className="grade-summary__foot">Shown once results are released</div>
+            </div>
+          </div>
+        )}
+
         {/* Performance summary */}
+        {isReleased && gradeInfo && (
         <div className="grade-summary">
           <div className={`grade-summary__score ${isPassed ? 'is-pass' : 'is-fail'}`}>
             <div className="grade-summary__label">Final percentage</div>
@@ -309,6 +339,7 @@ export const StudentResultPage: React.FC<StudentResultPageProps> = ({ examId, on
             </div>
           </div>
         </div>
+        )}
 
         {/* Per-question review — only ever present once results are released;
             the RPC withholds the answer key entirely until then. */}
