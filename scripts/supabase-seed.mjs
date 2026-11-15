@@ -40,7 +40,7 @@ const DEMO_ADMIN = {
 };
 
 const DEMO_STUDENTS = [
-  { email: 'sambit.biswas@adamas.ac.in', password: 'Student@12345', name: 'Sambit Biswas', role: 'student', roll_number: 'UG/SOET/30/24/043' },
+  { email: 'sambit.biswas@adamas.ac.in', password: 'Student@12345', name: 'Sagnik Dam', role: 'student', roll_number: 'UG/SOET/30/24/043' },
   { email: 'ananya.sen@adamas.ac.in', password: 'Student@12345', name: 'Ananya Sen', role: 'student', roll_number: 'UG/SOET/30/24/044' }
 ];
 

@@ -62,7 +62,7 @@ async function testSuite() {
       body: JSON.stringify({ email: 'sambit.biswas@adamas.ac.in', password: 'Student@12345' })
     });
     const studentData = await studentLoginRes.json();
-    assert(studentLoginRes.status === 200 && studentData.user.role === 'student', 'REQ-04: Student login successful (Sambit Biswas)');
+    assert(studentLoginRes.status === 200 && studentData.user.role === 'student', 'REQ-04: Student login successful (Sagnik Dam)');
     const studentToken = studentData.token;
 
     // 6. Security: Unauthenticated access to protected route (SEC-01, REQ-08)
@@ -238,7 +238,7 @@ async function testSuite() {
     assert(modifyAfterSubmitRes.status === 403, 'BR-09 & REQ-43: Answers locked permanently after submission (403)');
 
     // 18. Student Result Access: Released vs unreleased (REQ-47, REQ-50, BR-07)
-    // Sambit accessing his already released exam (CS201)
+    // Sagnik accessing their already released exam (CS201)
     const myReleasedRes = await fetch(`${BASE_URL}/results/exam/EXAM-CS201/my`, {
       headers: { 'Authorization': `Bearer ${studentToken}` }
     });

@@ -33,7 +33,7 @@ export function seedDatabase() {
     },
     {
       id: 'USR-STU-01',
-      name: 'Sambit Biswas',
+      name: 'Sagnik Dam',
       email: 'sambit.biswas@adamas.ac.in',
       passwordHash: studentPasswordHash,
       role: 'student',
@@ -437,7 +437,7 @@ export function seedDatabase() {
   }
   console.log('Seeded Question Bank with questions and options.');
 
-  // 4. Seed Completed Attempt & Released Result for Sambit Biswas on CS201
+  // 4. Seed Completed Attempt & Released Result for Sagnik Dam on CS201
   const attemptId = 'ATT-SAMBIT-CS201';
   db.prepare(`
     INSERT INTO exam_attempts (attempt_id, user_id, exam_id, start_time, end_time, time_remaining_seconds, status, submitted_at, evaluated_at)
