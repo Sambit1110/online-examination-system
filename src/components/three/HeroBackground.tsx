@@ -4,7 +4,36 @@ import type { SceneVariant } from './HeroScene';
 
 // Code-split: three.js + fiber + drei only download for a visitor who is
 // actually looking at a surface that uses them, and never for the exam screen.
-const HeroScene = lazy(() => import('./HeroScene').then(m => ({ default: m.HeroScene })));
+//
+// The layer is purely decorative, so a failed download (offline, or a tab
+// still running a build whose chunk a newer deploy has replaced) must
+// render nothing, never reach the app-wide error boundary.
+const HeroScene = lazy(() =>
+  import('./HeroScene')
+    .then(m => ({ default: m.HeroScene }))
+    .catch(err => {
+      console.warn('3D background skipped:', err);
+      const Nothing: React.FC<{ variant?: SceneVariant }> = () => null;
+      return { default: Nothing };
+    })
+);
+
+/** Contains a WebGL/render failure inside the decorative layer. */
+class SceneErrorBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(err: unknown) {
+    console.warn('3D background disabled after an error:', err);
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 interface HeroBackgroundProps {
   variant?: SceneVariant;
@@ -101,9 +130,11 @@ export const HeroBackground: React.FC<HeroBackgroundProps> = ({ variant = 'hero'
       aria-hidden="true"
     >
       {shouldRender && (
-        <Suspense fallback={null}>
-          <HeroScene variant={variant} />
-        </Suspense>
+        <SceneErrorBoundary>
+          <Suspense fallback={null}>
+            <HeroScene variant={variant} />
+          </Suspense>
+        </SceneErrorBoundary>
       )}
     </div>
   );

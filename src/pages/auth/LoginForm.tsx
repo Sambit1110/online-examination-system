@@ -33,7 +33,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   otherPortalLabel,
   onNavigate
 }) => {
-  const { login } = useAuth();
+  const { login, serviceUnreachable, recheckService } = useAuth();
+  const [rechecking, setRechecking] = useState(false);
+
+  const handleRecheck = async () => {
+    setRechecking(true);
+    const reachable = await recheckService();
+    setRechecking(false);
+    if (reachable) {
+      setError(null);
+      setErrorKind(undefined);
+    }
+  };
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -69,6 +80,22 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
   return (
     <>
+      {serviceUnreachable && !error && (
+        <div className="auth-alert auth-alert--operational" role="alert">
+          <ServerCrash size={16} aria-hidden="true" />
+          <div>
+            <strong className="auth-alert__label">Exam server not responding</strong>
+            <span>
+              The examination server can't be reached right now, so sign-in won't work yet. Check your
+              internet connection, then try again in a minute.
+            </span>
+            <button type="button" className="auth-alert__action" onClick={handleRecheck} disabled={rechecking}>
+              {rechecking ? 'Checking…' : 'Try again'} <ArrowRight size={13} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div
           className={`auth-alert${operational ? ' auth-alert--operational' : ''}${wrongPortal ? ' auth-alert--denied' : ''}`}

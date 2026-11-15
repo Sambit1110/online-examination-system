@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured, isSupabaseReachable } from '../lib/supabaseClient';
 import { describeError } from '../lib/format';
 import { User } from '../types';
 
@@ -38,7 +38,15 @@ interface AuthContextType {
    * same dead end.
    */
   profileError: string | null;
-  login: (identifier: string, pass: string, expectedRole: PortalRole) => Promise<LoginResult>;
+  /**
+   * True when the Supabase project could not be reached at all on boot
+   * (paused project, DNS failure, offline). The login screen says so up
+   * front instead of letting someone type a password into a dead service.
+   */
+  serviceUnreachable: boolean;
+  /** Re-checks the connection; clears `serviceUnreachable` when it is back. */
+  recheckService: () => Promise<boolean>;
+  login:(identifier: string, pass: string, expectedRole: PortalRole) => Promise<LoginResult>;
   /**
    * True while a sign-in is mid role-verification. The auth listener fires
    * as soon as Supabase accepts the password, so without this the app would
@@ -89,6 +97,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [portalCheckPending, setPortalCheckPending] = useState(false);
+  const [serviceUnreachable, setServiceUnreachable] = useState(false);
+
+  const recheckService = async () => {
+    const reachable = await isSupabaseReachable();
+    setServiceUnreachable(!reachable);
+    return reachable;
+  };
 
   useEffect(() => {
     // Without credentials every call would fail against a placeholder host;
@@ -108,13 +123,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(session.access_token);
     };
 
-    // Restore any existing session on first load (page refresh, new tab, etc.)
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // Checked in parallel with session restore so a dead backend is
+    // reported within seconds rather than after auth's own retries.
+    isSupabaseReachable().then(reachable => {
       if (!mounted) return;
-      if (session) await applySession(session);
-      if (!mounted) return;
-      setLoading(false);
+      setServiceUnreachable(!reachable);
+      if (!reachable) setLoading(false);
     });
+
+    // Restoring a stored session can stall while auth retries a token
+    // refresh against an unreachable server. Never hold the boot screen
+    // longer than this; the login page then explains what is wrong.
+    const bootTimeout = window.setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 8_000);
+
+    // Restore any existing session on first load (page refresh, new tab, etc.)
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session } }) => {
+        if (!mounted) return;
+        if (session) await applySession(session);
+      })
+      .catch(err => {
+        console.error('Session restore failed:', err);
+      })
+      .finally(() => {
+        window.clearTimeout(bootTimeout);
+        if (mounted) setLoading(false);
+      });
 
     // Keep the session in sync across tabs, token refreshes, and sign-outs.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -315,6 +352,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         loading,
         profileError,
+        serviceUnreachable,
+        recheckService,
         portalCheckPending,
         login,
         logout,

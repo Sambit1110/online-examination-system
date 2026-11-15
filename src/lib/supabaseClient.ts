@@ -25,6 +25,24 @@ if (!isSupabaseConfigured) {
 // enforced per-request based on the caller's authenticated session. The
 // secret key (which bypasses RLS entirely) must never appear here or
 // anywhere under src/.
+/**
+ * No request may wait forever. Without a limit, an unreachable project
+ * (paused, or a dropped connection) leaves the boot spinner up
+ * indefinitely instead of telling the user something is wrong.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
+const fetchWithTimeout: typeof fetch = (input, init = {}) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const callerSignal = init.signal;
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort();
+    else callerSignal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+};
+
 export const supabase = createClient(
   supabaseUrl || 'https://unconfigured.supabase.co',
   supabasePublishableKey || 'unconfigured',
@@ -33,6 +51,29 @@ export const supabase = createClient(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true
-    }
+    },
+    global: { fetch: fetchWithTimeout }
   }
 );
+
+/**
+ * Resolves `false` when the Supabase project cannot be reached at all
+ * (DNS failure, project paused, offline). Any HTTP answer, even an error
+ * status, means the service is up.
+ */
+export const isSupabaseReachable = async (timeoutMs = 6_000): Promise<boolean> => {
+  if (!isSupabaseConfigured) return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    await fetch(`${supabaseUrl}/auth/v1/health`, {
+      headers: { apikey: supabasePublishableKey as string },
+      signal: controller.signal
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+};
