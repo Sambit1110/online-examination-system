@@ -37,7 +37,7 @@ export function seedDatabase() {
       email: 'sagnik.dam@adamas.ac.in',
       passwordHash: studentPasswordHash,
       role: 'student',
-      rollNumber: 'UG/SOET/30/24/043',
+      rollNumber: 'UG/SOET/30/24/139',
       department: 'Computer Science and Engineering'
     },
     {
