@@ -34,7 +34,7 @@ export function seedDatabase() {
     {
       id: 'USR-STU-01',
       name: 'Sagnik Dam',
-      email: 'sambit.biswas@adamas.ac.in',
+      email: 'sagnik.dam@adamas.ac.in',
       passwordHash: studentPasswordHash,
       role: 'student',
       rollNumber: 'UG/SOET/30/24/043',

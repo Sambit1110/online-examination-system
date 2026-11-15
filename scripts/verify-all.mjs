@@ -59,7 +59,7 @@ async function testSuite() {
     const studentLoginRes = await fetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'sambit.biswas@adamas.ac.in', password: 'Student@12345' })
+      body: JSON.stringify({ email: 'sagnik.dam@adamas.ac.in', password: 'Student@12345' })
     });
     const studentData = await studentLoginRes.json();
     assert(studentLoginRes.status === 200 && studentData.user.role === 'student', 'REQ-04: Student login successful (Sagnik Dam)');
