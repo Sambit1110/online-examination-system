@@ -1,88 +1,89 @@
-import React from 'react';
-import { ShieldCheck, KeyRound, ArrowRight, CalendarDays, FileQuestion, Award, Users, DatabaseBackup } from 'lucide-react';
-import { HeroBackground } from '../../components/three/HeroBackground';
+import React, { useRef } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { LoginForm } from './LoginForm';
 import { ROUTES } from '../../hooks/useRoute';
+import { useScrollReveal } from '../../hooks/useScrollReveal';
 
-/** What the console actually governs — describes real features, not metrics. */
-const SCOPE = [
-  { icon: <CalendarDays size={13} />, label: 'Examinations' },
-  { icon: <FileQuestion size={13} />, label: 'Question bank' },
-  { icon: <Award size={13} />, label: 'Gradebook' },
-  { icon: <Users size={13} />, label: 'Accounts' },
-  { icon: <DatabaseBackup size={13} />, label: 'Backup & audit' }
-];
+/** What the console actually governs: real features, not metrics. */
+const SCOPE = ['Examinations', 'Question bank', 'Gradebook', 'Accounts', 'Backup & audit'];
 
 interface Props {
   onNavigate: (to: string) => void;
 }
 
 /**
- * Staff portal. Deliberately a different composition from the candidate
- * side: a single centred control panel rather than a narrative spread,
- * cooler palette, monospace framing, and an explicit restricted-access
- * notice. It should read as an operations console, not a welcome mat.
+ * Staff portal. Same poster system as the student side, inverted: an ink
+ * field instead of cobalt, and the console's scope set as a ruled index,
+ * so the two portals can never be mistaken for each other.
  */
-export const AdminLoginPage: React.FC<Props> = ({ onNavigate }) => (
-  <div className="auth-shell auth-shell--admin">
-    <HeroBackground variant="admin" />
+export const AdminLoginPage: React.FC<Props> = ({ onNavigate }) => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  useScrollReveal(rootRef);
 
-    <main className="admin-auth">
-      <div className="admin-auth__panel">
-        <div className="admin-auth__restricted">
-          <ShieldCheck size={12} aria-hidden="true" />
-          Restricted · Examination staff only
-        </div>
+  return (
+    <div className="poster-page" ref={rootRef}>
+      <main className="poster-auth">
+        <section className="poster-field poster-field--ink" aria-labelledby="console-title">
+          <header className="poster-field__masthead" data-reveal>
+            <span>Office of the Controller of Examinations</span>
+            <span>Restricted · staff only</span>
+          </header>
 
-        <header className="admin-auth__head">
-          <span className="admin-auth__crest" aria-hidden="true">
-            <KeyRound size={22} />
-          </span>
-          <span className="eyebrow">Office of the Controller of Examinations</span>
-          <h1 className="admin-auth__title">Examination Console</h1>
-          <p className="admin-auth__sub">
-            Adamas University · Department of Computer Science &amp; Engineering
-          </p>
-        </header>
+          <div className="poster-field__body">
+            <h1 id="console-title" className="poster-mega" data-reveal data-reveal-delay="1">
+              Console
+            </h1>
+          </div>
 
-        <div className="admin-auth__rule" aria-hidden="true" />
-
-        <LoginForm
-          expectedRole="admin"
-          identifierLabel="Administrator email"
-          identifierPlaceholder="controller@adamasuniversity.ac.in"
-          identifierHint="Staff accounts sign in with their institutional email address."
-          submitLabel="Authenticate"
-          otherPortalHref={ROUTES.studentLogin}
-          otherPortalLabel="Go to Student Login"
-          onNavigate={onNavigate}
-        />
-
-        <div className="admin-auth__scope">
-          <span className="admin-auth__scope-label">This console governs</span>
-          <ul className="admin-auth__scope-list">
-            {SCOPE.map(s => (
-              <li key={s.label}>
-                <span aria-hidden="true">{s.icon}</span>
-                {s.label}
+          <ul className="poster-index" aria-label="This console governs">
+            {SCOPE.map((label, i) => (
+              <li key={label} data-reveal data-reveal-delay={String(2 + i)}>
+                {label}
               </li>
             ))}
           </ul>
-        </div>
+        </section>
 
-        <p className="admin-auth__notice">
-          All administrative actions are recorded against your account in the audit trail.
-        </p>
-      </div>
+        <section className="poster-form" aria-labelledby="admin-signin-title">
+          <div className="poster-form__inner">
+            <h2 id="admin-signin-title" className="poster-form__title" data-reveal data-reveal-delay="2">
+              Administrator sign-in
+            </h2>
+            <p className="poster-form__hint" data-reveal data-reveal-delay="3">
+              Adamas University · Department of Computer Science &amp; Engineering
+            </p>
 
-      <button type="button" className="auth-crosslink" onClick={() => onNavigate(ROUTES.studentLogin)}>
-        Student? Sign in to Student Portal <ArrowRight size={13} aria-hidden="true" />
-      </button>
-    </main>
+            <div data-reveal data-reveal-delay="4">
+              <LoginForm
+                expectedRole="admin"
+                identifierLabel="Administrator email"
+                identifierPlaceholder="controller@adamasuniversity.ac.in"
+                identifierHint="Staff accounts sign in with their institutional email address."
+                submitLabel="Authenticate"
+                otherPortalHref={ROUTES.studentLogin}
+                otherPortalLabel="Go to Student Login"
+                onNavigate={onNavigate}
+              />
+            </div>
 
-    <footer className="auth-footer">
-      <span>Adamas University · Online Examination System</span>
-      <span>© {new Date().getFullYear()}</span>
-    </footer>
-  </div>
-);
+            <p className="poster-form__foot">
+              Every administrative action is recorded against your account in the audit trail.
+            </p>
+
+            <button type="button" className="poster-crosslink" onClick={() => onNavigate(ROUTES.studentLogin)}>
+              <span>Sitting an exam?</span>
+              <span className="poster-crosslink__action">
+                Student portal <ArrowRight size={14} aria-hidden="true" />
+              </span>
+            </button>
+          </div>
+        </section>
+      </main>
+
+      <footer className="poster-footer">
+        <span>Adamas University · Online Examination System</span>
+        <span>© {new Date().getFullYear()}</span>
+      </footer>
+    </div>
+  );
+};

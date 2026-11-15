@@ -14,3 +14,10 @@ supabase/.branches/
 .claude/
 .vercel
 .env*
+
+# Local tool output
+.playwright-mcp/
+.impeccable/review/
+.impeccable/hook.cache.json
+.impeccable/config.local.json
+.impeccable/questions/

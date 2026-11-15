@@ -528,7 +528,6 @@ export const ExamInterfacePage: React.FC<ExamInterfacePageProps> = ({ examId, on
       {/* 1. PERSISTENT EXAM HEADER (distraction-free) */}
       <header className="exam-header">
         <div className="exam-header__identity">
-          <div className="exam-header__eyebrow">Adamas University • Examination Session</div>
           <h1 className="exam-header__title">{examTitle}</h1>
           <div className="exam-header__candidate">
             Candidate: <strong>{user?.name}</strong>

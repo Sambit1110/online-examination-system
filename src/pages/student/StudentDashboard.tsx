@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Examination } from '../../types';
@@ -6,19 +6,10 @@ import { Badge } from '../../components/common/Badge';
 import { EmptyState } from '../../components/common/EmptyState';
 import { ErrorBanner } from '../../components/common/ErrorState';
 import { SkeletonCards } from '../../components/common/Skeleton';
-import { TiltCard } from '../../components/common/TiltCard';
-import { HeroBackground } from '../../components/three/HeroBackground';
-import { formatDateTime, formatRelative, describeError } from '../../lib/format';
-import {
-  Clock,
-  Calendar,
-  FileText,
-  Award,
-  Play,
-  RotateCcw,
-  BookOpen,
-  CalendarClock
-} from 'lucide-react';
+import { ExamWindowBar } from '../../components/poster/ExamWindowBar';
+import { useScrollReveal } from '../../hooks/useScrollReveal';
+import { formatDateTime, describeError } from '../../lib/format';
+import { Award, RotateCcw, BookOpen, CalendarClock, ArrowRight } from 'lucide-react';
 
 interface StudentDashboardProps {
   onStartExam: (examId: string) => void;
@@ -55,6 +46,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
   const [exams, setExams] = useState<Examination[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useScrollReveal(rootRef, [loading, exams.length]);
 
   const fetchExams = useCallback(async () => {
     if (!user) return;
@@ -142,70 +135,51 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
       : null;
 
   return (
-    <div className="page-stack">
-      {/* Candidate hero */}
-      <header className="student-hero">
-        <HeroBackground variant="ambient" className="student-hero__canvas" />
-
-        <div className="student-hero__body">
-          <div className="student-hero__identity">
-            <span className="eyebrow">{greeting}</span>
-            <h1 className="serif-title student-hero__name">{user?.name}</h1>
-            <div className="student-hero__meta">
-              {user?.rollNumber && (
-                <span className="student-hero__roll">{user.rollNumber}</span>
-              )}
-              {user?.department && <span>{user.department}</span>}
-            </div>
-          </div>
-
-          <dl className="metric-strip">
-            <div className="metric-chip">
-              <dt className="metric-chip__label">Open now</dt>
-              <dd className="metric-chip__value" style={{ color: 'var(--color-success)' }}>
-                {loading ? '—' : liveExams.length}
-              </dd>
-            </div>
-            <div className="metric-chip">
-              <dt className="metric-chip__label">Completed</dt>
-              <dd className="metric-chip__value">{loading ? '—' : completedExams.length}</dd>
-            </div>
-            <div className="metric-chip">
-              <dt className="metric-chip__label">Average</dt>
-              <dd className="metric-chip__value" style={{ color: 'var(--color-gold)' }}>
-                {loading || avgScore === null ? '—' : `${avgScore}%`}
-              </dd>
-            </div>
-          </dl>
+    <div className="page-stack poster-dashboard" ref={rootRef}>
+      <header className="poster-masthead">
+        <div className="poster-masthead__identity">
+          <h1 className="poster-masthead__name" data-reveal data-reveal-delay="1">{user?.name}</h1>
+          <p className="poster-masthead__meta" data-reveal data-reveal-delay="2">
+            {user?.rollNumber && <span>{user.rollNumber}</span>}
+            {user?.department && <span>{user.department}</span>}
+            <span>{greeting}</span>
+          </p>
         </div>
+
+        <p className="poster-masthead__summary" data-reveal data-reveal-delay="3" aria-live="polite">
+          {loading ? (
+            'Loading your examinations…'
+          ) : (
+            <>
+              <strong>{liveExams.length}</strong> {liveExams.length === 1 ? 'paper' : 'papers'} open now
+              <span className="poster-masthead__sep" aria-hidden="true" />
+              <strong>{upcomingExams.length}</strong> scheduled
+              <span className="poster-masthead__sep" aria-hidden="true" />
+              <strong>{completedExams.length}</strong> completed
+              {avgScore !== null && (
+                <>
+                  <span className="poster-masthead__sep" aria-hidden="true" />
+                  average <strong>{avgScore}%</strong>
+                </>
+              )}
+            </>
+          )}
+        </p>
       </header>
 
       {error && <ErrorBanner message={error} onRetry={fetchExams} />}
 
-      {/* 1. LIVE EXAMINATIONS */}
-      <section className="animate-slide-up stagger-1">
-        <div className="section-head">
-          <h2 className="section-head__title">
-            <span
-              className="pulse-dot-live"
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--color-success)',
-                display: 'inline-block'
-              }}
-              aria-hidden="true"
-            />
-            Available now {!loading && `(${liveExams.length})`}
-          </h2>
-          <span className="section-head__meta">Open for attempt within the scheduled window</span>
+      {/* 1. OPEN NOW */}
+      <section aria-labelledby="open-title">
+        <div className="poster-section-head" data-reveal>
+          <h2 id="open-title" className="poster-section-head__title">Open now</h2>
+          <span className="poster-section-head__meta">Start within the scheduled window</span>
         </div>
 
         {loading ? (
-          <SkeletonCards count={2} height="230px" label="Loading available examinations" />
+          <SkeletonCards count={2} height="120px" label="Loading available examinations" />
         ) : liveExams.length === 0 ? (
-          <div className="card">
+          <div className="timetable-empty" data-reveal>
             <EmptyState
               icon={<BookOpen size={28} strokeWidth={1.5} />}
               title="No examinations are open right now"
@@ -213,104 +187,65 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
             />
           </div>
         ) : (
-          <div className="card-grid">
-            {liveExams.map((exam, idx) => (
-              <TiltCard
-                key={exam.exam_id}
-                maxTilt={4}
-                className={`card animate-slide-up stagger-${(idx % 4) + 1}`}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  borderTop: '3px solid var(--color-action)'
-                }}
-              >
-                <div>
-                  <div className="detail-row" style={{ marginBottom: '0.7rem' }}>
+          <ol className="timetable">
+            {liveExams.map(exam => (
+              <li key={exam.exam_id} className="timetable-row timetable-row--open" data-reveal>
+                <div className="timetable-row__main">
+                  <div className="timetable-row__status">
                     <Badge type={exam.attempt_status === 'in_progress' ? 'in_progress' : 'live'}>
-                      {exam.attempt_status === 'in_progress' ? 'In progress' : 'Live'}
+                      {exam.attempt_status === 'in_progress' ? 'In progress' : 'Open'}
                     </Badge>
-                    <span
-                      style={{
-                        fontSize: '0.7rem',
-                        color: 'var(--text-muted)',
-                        fontFamily: 'var(--font-mono)'
-                      }}
-                    >
-                      {shortRef(exam.exam_id)}
-                    </span>
+                    <span className="timetable-row__ref">{shortRef(exam.exam_id)}</span>
                   </div>
-
-                  <h3 style={{ fontSize: '1.05rem', marginBottom: '0.4rem' }}>{exam.title}</h3>
-
-                  {exam.description && (
-                    <p
-                      style={{
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.84rem',
-                        marginBottom: '1.15rem',
-                        lineHeight: 1.55
-                      }}
-                    >
-                      {exam.description}
-                    </p>
-                  )}
-
-                  <div className="meta-grid exam-summary-box">
-                    <div>
-                      <div className="meta-grid__label">Duration</div>
-                      <div className="meta-grid__value">
-                        <Clock size={13} color="var(--color-action-hover)" aria-hidden="true" />{' '}
-                        {exam.duration_minutes} minutes
-                      </div>
-                    </div>
-                    <div>
-                      <div className="meta-grid__label">Paper</div>
-                      <div className="meta-grid__value">
-                        <FileText size={13} color="var(--color-success)" aria-hidden="true" />{' '}
-                        {exam.question_count} questions · {exam.total_marks} marks
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="muted-note" style={{ marginBottom: '1.15rem' }}>
-                    Closes {formatDateTime(exam.end_time)}
+                  <h3 className="timetable-row__title">{exam.title}</h3>
+                  {exam.description && <p className="timetable-row__desc">{exam.description}</p>}
+                  <p className="timetable-row__facts">
+                    <span>{exam.duration_minutes} min</span>
+                    <span>{exam.question_count} questions</span>
+                    <span>{exam.total_marks} marks</span>
+                    {exam.negative_marks_per_question > 0 && (
+                      <span>−{exam.negative_marks_per_question} per wrong answer</span>
+                    )}
                   </p>
                 </div>
 
-                <button
-                  onClick={() => onStartExam(exam.exam_id)}
-                  className={`btn ${exam.attempt_status === 'in_progress' ? 'btn-primary' : 'btn-success'}`}
-                  style={{ width: '100%' }}
-                >
-                  {exam.attempt_status === 'in_progress' ? (
-                    <>
-                      <RotateCcw size={15} aria-hidden="true" /> Resume examination
-                    </>
-                  ) : (
-                    <>
-                      <Play size={15} aria-hidden="true" /> Review instructions &amp; begin
-                    </>
-                  )}
-                </button>
-              </TiltCard>
+                <div className="timetable-row__window">
+                  <ExamWindowBar start={exam.start_time} end={exam.end_time} state="open" />
+                </div>
+
+                <div className="timetable-row__action">
+                  <button
+                    onClick={() => onStartExam(exam.exam_id)}
+                    className="btn btn-primary timetable-row__button"
+                  >
+                    {exam.attempt_status === 'in_progress' ? (
+                      <>
+                        <RotateCcw size={15} aria-hidden="true" /> Resume
+                      </>
+                    ) : (
+                      <>
+                        Begin <ArrowRight size={15} aria-hidden="true" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </li>
             ))}
-          </div>
+          </ol>
         )}
       </section>
 
-      {/* 2. UPCOMING */}
-      <section className="animate-slide-up stagger-2">
-        <div className="section-head">
-          <h2 className="section-head__title">Scheduled {!loading && `(${upcomingExams.length})`}</h2>
-          <span className="section-head__meta">Locked until the published start time</span>
+      {/* 2. SCHEDULED */}
+      <section aria-labelledby="scheduled-title">
+        <div className="poster-section-head" data-reveal>
+          <h2 id="scheduled-title" className="poster-section-head__title">Scheduled</h2>
+          <span className="poster-section-head__meta">Locked until the published start time</span>
         </div>
 
         {loading ? (
-          <SkeletonCards count={2} height="150px" label="Loading scheduled examinations" />
+          <SkeletonCards count={2} height="100px" label="Loading scheduled examinations" />
         ) : upcomingExams.length === 0 ? (
-          <div className="card">
+          <div className="timetable-empty" data-reveal>
             <EmptyState
               icon={<CalendarClock size={28} strokeWidth={1.5} />}
               title="Nothing scheduled ahead"
@@ -318,61 +253,37 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
             />
           </div>
         ) : (
-          <div className="card-grid">
-            {upcomingExams.map((exam, idx) => (
-              <div
-                key={exam.exam_id}
-                className={`card card-hover animate-slide-up stagger-${(idx % 4) + 1}`}
-              >
-                <div className="detail-row" style={{ marginBottom: '0.55rem' }}>
-                  <Badge type="scheduled">Scheduled</Badge>
-                  <span
-                    style={{
-                      fontSize: '0.7rem',
-                      color: 'var(--text-muted)',
-                      fontFamily: 'var(--font-mono)'
-                    }}
-                  >
-                    {shortRef(exam.exam_id)}
-                  </span>
-                </div>
-
-                <h3 style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>{exam.title}</h3>
-
-                {exam.description && (
-                  <p
-                    style={{
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.8125rem',
-                      marginBottom: '1rem'
-                    }}
-                  >
-                    {exam.description}
+          <ol className="timetable">
+            {upcomingExams.map(exam => (
+              <li key={exam.exam_id} className="timetable-row" data-reveal>
+                <div className="timetable-row__main">
+                  <div className="timetable-row__status">
+                    <Badge type="scheduled">Scheduled</Badge>
+                    <span className="timetable-row__ref">{shortRef(exam.exam_id)}</span>
+                  </div>
+                  <h3 className="timetable-row__title">{exam.title}</h3>
+                  {exam.description && <p className="timetable-row__desc">{exam.description}</p>}
+                  <p className="timetable-row__facts">
+                    <span>{exam.duration_minutes} min</span>
+                    <span>{exam.total_marks} marks</span>
+                    <span>Opens {formatDateTime(exam.start_time)}</span>
                   </p>
-                )}
-
-                <div className="schedule-note">
-                  <Calendar size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
-                  <span>
-                    Opens <strong>{formatDateTime(exam.start_time)}</strong>
-                    <span style={{ opacity: 0.8 }}> · {formatRelative(exam.start_time)}</span>
-                  </span>
                 </div>
-
-                <div className="muted-note" style={{ marginTop: '0.75rem' }}>
-                  {exam.duration_minutes} minutes · {exam.total_marks} marks
+                <div className="timetable-row__window">
+                  <ExamWindowBar start={exam.start_time} end={exam.end_time} state="upcoming" />
                 </div>
-              </div>
+                <div className="timetable-row__action" aria-hidden="true" />
+              </li>
             ))}
-          </div>
+          </ol>
         )}
       </section>
 
       {/* 3. COMPLETED */}
-      <section className="animate-slide-up stagger-3">
-        <div className="section-head">
-          <h2 className="section-head__title">Completed {!loading && `(${completedExams.length})`}</h2>
-          <span className="section-head__meta">Grade slips and submission records</span>
+      <section aria-labelledby="completed-title" data-reveal>
+        <div className="poster-section-head">
+          <h2 id="completed-title" className="poster-section-head__title">Completed</h2>
+          <span className="poster-section-head__meta">Grade slips and submission records</span>
         </div>
 
         {loading ? (

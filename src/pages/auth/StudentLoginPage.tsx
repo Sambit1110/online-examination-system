@@ -1,104 +1,131 @@
-import React from 'react';
-import { GraduationCap, Lock, Clock, FileCheck, ShieldCheck, ArrowRight } from 'lucide-react';
-import { TiltCard } from '../../components/common/TiltCard';
-import { HeroBackground } from '../../components/three/HeroBackground';
+import React, { useRef } from 'react';
+import { ArrowRight, ArrowDown } from 'lucide-react';
 import { LoginForm } from './LoginForm';
 import { ROUTES } from '../../hooks/useRoute';
+import { DayRuler } from '../../components/poster/DayRuler';
+import { useScrollReveal } from '../../hooks/useScrollReveal';
 
-const HIGHLIGHTS = [
+const PRINCIPLES = [
   {
-    icon: <Clock size={15} />,
-    title: 'Timed, server-authoritative',
-    body: 'The clock is held by the university server, not your browser.'
+    statement: 'The clock is kept by the server.',
+    detail:
+      'Your time limit is enforced by the university database, not your browser. Answers sent after time is up are refused, and a late submission is recorded as timed out.'
   },
   {
-    icon: <FileCheck size={15} />,
-    title: 'Continuous autosave',
-    body: 'Every response is written as you answer, and retried if the network drops.'
+    statement: 'Every answer is saved as you go.',
+    detail:
+      'Each response is written the moment you choose it. If the network drops it is retried, and the header shows anything still unsaved before you submit.'
   },
   {
-    icon: <ShieldCheck size={15} />,
-    title: 'Transparent integrity',
-    body: 'Only tab and window focus are observed. No camera, microphone or screen capture.'
+    statement: 'Integrity, without cameras.',
+    detail:
+      'Only tab and window focus are noted, for the Examination Cell to review. No webcam, microphone or screen recording, ever.'
+  },
+  {
+    statement: 'Marks stay sealed until release.',
+    detail:
+      'Correct answers and scores never reach your browser while an exam is under evaluation. They appear together, as an official grade slip, once results are released.'
   }
 ];
+
+const today = () =>
+  new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
 interface Props {
   onNavigate: (to: string) => void;
 }
 
 /**
- * Candidate portal. Warm, academic, editorial — the narrative column sets
- * expectations about the examination environment before asking for
- * credentials.
+ * Candidate portal, set as the department's official notice: a cobalt
+ * field carrying the day itself, the sign-in form on the paper beside it,
+ * and below the fold the four rules the portal enforces.
  */
-export const StudentLoginPage: React.FC<Props> = ({ onNavigate }) => (
-  <div className="auth-shell auth-shell--student">
-    <HeroBackground variant="hero" />
+export const StudentLoginPage: React.FC<Props> = ({ onNavigate }) => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  useScrollReveal(rootRef);
 
-    <main className="auth-grid">
-      <section className="auth-story" aria-hidden="true">
-        <span className="eyebrow">Adamas University · Student Portal</span>
-        <h1 className="serif-title auth-story__title">
-          The examination hall,
-          <br />
-          <em>reimagined.</em>
-        </h1>
-        <p className="auth-story__lede">
-          Department of Computer Science &amp; Engineering — a calm, monitored environment for
-          sitting departmental assessments.
-        </p>
-
-        <ul className="auth-story__list">
-          {HIGHLIGHTS.map(h => (
-            <li className="auth-story__item" key={h.title}>
-              <span className="auth-story__icon">{h.icon}</span>
-              <span>
-                <strong>{h.title}</strong>
-                <span className="auth-story__body">{h.body}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="auth-panel">
-        <TiltCard maxTilt={3.5} className="glass-panel auth-card">
-          <header className="auth-card__head">
-            <span className="auth-card__mark" aria-hidden="true">
-              <GraduationCap size={20} />
-            </span>
-            <div>
-              <h2 className="auth-card__title">Student sign in</h2>
-              <p className="auth-card__hint">Use your university email or roll number.</p>
-            </div>
+  return (
+    <div className="poster-page" ref={rootRef}>
+      <main className="poster-auth">
+        <section className="poster-field" aria-labelledby="portal-title">
+          <header className="poster-field__masthead" data-reveal>
+            <span>Adamas University</span>
+            <span>Department of Computer Science &amp; Engineering</span>
           </header>
 
-          <LoginForm
-            expectedRole="student"
-            identifierLabel="Email or roll number"
-            identifierPlaceholder="you@adamasuniversity.ac.in"
-            submitLabel="Sign in"
-            otherPortalHref={ROUTES.adminLogin}
-            otherPortalLabel="Go to Admin Login"
-            onNavigate={onNavigate}
-          />
+          <div className="poster-field__body">
+            <p className="poster-field__date" data-reveal data-reveal-delay="1">
+              {today()}
+            </p>
+            <h1 id="portal-title" className="poster-mega" data-reveal data-reveal-delay="2">
+              Examin&shy;ations
+            </h1>
+            <p className="poster-field__lede" data-reveal data-reveal-delay="3">
+              The student portal for departmental assessments: timed MCQ papers, saved as you answer,
+              graded by the server.
+            </p>
+          </div>
 
-          <p className="auth-card__foot">
-            <Lock size={12} aria-hidden="true" />
-            Access is restricted to enrolled candidates.
-          </p>
-        </TiltCard>
+          <div data-reveal data-reveal-delay="4">
+            <DayRuler />
+          </div>
 
-        <button type="button" className="auth-crosslink" onClick={() => onNavigate(ROUTES.adminLogin)}>
-          Administrator? Sign in to Admin Portal <ArrowRight size={13} aria-hidden="true" />
-        </button>
+          <a className="poster-field__cue" href="#how-it-works">
+            How the portal keeps an exam fair <ArrowDown size={14} aria-hidden="true" />
+          </a>
+        </section>
+
+        <section className="poster-form" aria-labelledby="signin-title">
+          <div className="poster-form__inner">
+            <h2 id="signin-title" className="poster-form__title" data-reveal data-reveal-delay="2">
+              Student sign-in
+            </h2>
+            <p className="poster-form__hint" data-reveal data-reveal-delay="3">
+              Use your university email or roll number.
+            </p>
+
+            <div data-reveal data-reveal-delay="4">
+              <LoginForm
+                expectedRole="student"
+                identifierLabel="Email or roll number"
+                identifierPlaceholder="you@adamasuniversity.ac.in"
+                submitLabel="Sign in"
+                otherPortalHref={ROUTES.adminLogin}
+                otherPortalLabel="Go to Admin Login"
+                onNavigate={onNavigate}
+              />
+            </div>
+
+            <p className="poster-form__foot">Access is restricted to enrolled candidates.</p>
+
+            <button type="button" className="poster-crosslink" onClick={() => onNavigate(ROUTES.adminLogin)}>
+              <span>Examination staff</span>
+              <span className="poster-crosslink__action">
+                Admin portal <ArrowRight size={14} aria-hidden="true" />
+              </span>
+            </button>
+          </div>
+        </section>
+      </main>
+
+      <section id="how-it-works" className="poster-principles" aria-labelledby="principles-title">
+        <h2 id="principles-title" className="poster-section-title" data-reveal>
+          How the portal keeps an exam fair
+        </h2>
+        <ol className="poster-principles__list">
+          {PRINCIPLES.map(p => (
+            <li className="poster-principle" key={p.statement} data-reveal>
+              <p className="poster-principle__statement">{p.statement}</p>
+              <p className="poster-principle__detail">{p.detail}</p>
+            </li>
+          ))}
+        </ol>
       </section>
-    </main>
 
-    <footer className="auth-footer">
-      <span>Adamas University · Online Examination System</span>
-      <span>© {new Date().getFullYear()}</span>
-    </footer>
-  </div>
-);
+      <footer className="poster-footer">
+        <span>Adamas University · Online Examination System</span>
+        <span>© {new Date().getFullYear()}</span>
+      </footer>
+    </div>
+  );
+};

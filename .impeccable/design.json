@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-16T00:00:00Z",
+  "title": "Design System: Adamas University Online Examination System",
+  "extensions": {
+    "colorMeta": {
+      "cobalt": { "role": "primary", "displayName": "Notice Cobalt", "canonical": "#1F3BFF", "tonalRamp": ["#05105C", "#0A1A99", "#0E22B0", "#1530DB", "#1F3BFF", "#5C71FF", "#A3AFFF", "#E1E5FF"] },
+      "cobalt-hover": { "role": "primary", "displayName": "Pressed Cobalt", "canonical": "#1530DB", "tonalRamp": ["#05105C", "#0A1A99", "#0E22B0", "#1530DB", "#1F3BFF", "#5C71FF", "#A3AFFF", "#E1E5FF"] },
+      "cobalt-active": { "role": "primary", "displayName": "Deep Cobalt", "canonical": "#0E22B0", "tonalRamp": ["#05105C", "#0A1A99", "#0E22B0", "#1530DB", "#1F3BFF", "#5C71FF", "#A3AFFF", "#E1E5FF"] },
+      "ink": { "role": "neutral", "displayName": "Notice Ink", "canonical": "#111111", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E0E0DB", "#F1F1EE", "#F6F6F4"] },
+      "ink-secondary": { "role": "neutral", "displayName": "Graphite", "canonical": "#3B3B38", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E0E0DB", "#F1F1EE", "#F6F6F4"] },
+      "ink-muted": { "role": "neutral", "displayName": "Pencil", "canonical": "#64645F", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E0E0DB", "#F1F1EE", "#F6F6F4"] },
+      "ink-faint": { "role": "neutral", "displayName": "Faint Pencil (non-text only)", "canonical": "#8A8A84", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E0E0DB", "#F1F1EE", "#F6F6F4"] },
+      "paper": { "role": "neutral", "displayName": "Cool Paper", "canonical": "#F6F6F4", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E0E0DB", "#F1F1EE", "#F6F6F4"] },
+      "paper-white": { "role": "neutral", "displayName": "Sheet White", "canonical": "#FFFFFF", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E0E0DB", "#F6F6F4", "#FFFFFF"] },
+      "paper-tint": { "role": "neutral", "displayName": "Paper Tint", "canonical": "#F1F1EE", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E0E0DB", "#F1F1EE", "#F6F6F4"] },
+      "paper-shade": { "role": "neutral", "displayName": "Paper Shade", "canonical": "#E7E7E3", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E7E7E3", "#F1F1EE", "#F6F6F4"] },
+      "rule-subtle": { "role": "neutral", "displayName": "Hairline", "canonical": "#E0E0DB", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E0E0DB", "#F1F1EE", "#F6F6F4"] },
+      "rule-prominent": { "role": "neutral", "displayName": "Rule", "canonical": "#CACAC4", "tonalRamp": ["#111111", "#3B3B38", "#64645F", "#8A8A84", "#CACAC4", "#E0E0DB", "#F1F1EE", "#F6F6F4"] },
+      "success": { "role": "status", "displayName": "Ledger Green", "canonical": "#0A7A45", "tonalRamp": ["#032614", "#054023", "#08663A", "#0A7A45", "#3D9B6F", "#7DBF9F", "#BFE0D0", "#EBF5F0"] },
+      "warning": { "role": "status", "displayName": "Ochre", "canonical": "#9A5B00", "tonalRamp": ["#2E1B00", "#4D2E00", "#7F4B00", "#9A5B00", "#B9853A", "#D4B07D", "#EBD8BE", "#F7F0E6"] },
+      "danger": { "role": "status", "displayName": "Seal Red", "canonical": "#C21A2E", "tonalRamp": ["#3D080E", "#660E18", "#A11526", "#C21A2E", "#D4525F", "#E38F98", "#F1C6CB", "#FAEBED"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "One monumental word per field, condensed (wdth 68), flush left." },
+      "numeral": { "displayName": "Numeral", "purpose": "Live clock, grade values, exam timer: condensed heavy tabular figures." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles, max 16ch." },
+      "title": { "displayName": "Title", "purpose": "Form titles; timetable and section-head titles run smaller in the same voice." },
+      "body": { "displayName": "Body", "purpose": "Running text, tabular figures, normal width." },
+      "label": { "displayName": "Label", "purpose": "Form labels, metadata, badges, crosslinks; sentence case, no tracking." }
+    },
+    "shadows": [
+      { "name": "surface", "value": "none", "purpose": "Every card, button, input, row and alert is flat." },
+      { "name": "overlay-lg", "value": "0 18px 40px -18px rgba(17, 17, 17, 0.28)", "purpose": "Popovers and menus." },
+      { "name": "overlay-xl", "value": "0 24px 56px -20px rgba(17, 17, 17, 0.32)", "purpose": "Larger floating overlays." },
+      { "name": "modal", "value": "0 28px 64px -18px rgba(17, 17, 17, 0.38)", "purpose": "Dialogs, over an ink scrim at rgba(17, 17, 17, 0.55)." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Colour transitions on buttons, rows, links." },
+      { "name": "ease-entrance", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Entrances." },
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.19, 1, 0.22, 1)", "purpose": "Scroll reveal settle and bars growing to their real length." },
+      { "name": "duration-fast", "value": "0.13s", "purpose": "Button colour changes." },
+      { "name": "duration-base", "value": "0.24s", "purpose": "Row lift into cobalt, crosslink arrow, link rules." },
+      { "name": "duration-slow", "value": "0.6s", "purpose": "Longer state changes." },
+      { "name": "reveal", "value": "opacity 0.7s, transform 0.9s, clip-path 0.9s ease-out-expo; translateY(18px) and inset(0 0 100% 0) start; 70ms stagger step", "purpose": "The single scroll grammar. Armed by script only; off under reduced motion, hidden tabs and on the exam screen; 1.2s failsafe." },
+      { "name": "bar-grow", "value": "transform 1.2s-1.4s ease-out-expo", "purpose": "Day ruler and window bar fill scale from 0 to the real fraction; no transition under reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "tablet", "value": "1080px" },
+      { "name": "phone", "value": "760px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action Bar",
+      "kind": "button",
+      "refersTo": "button-submit-bar",
+      "description": "Full-width cobalt bar for the sign-in submit: label left, arrow right.",
+      "html": "<button class=\"ds-btn-bar\"><span>Sign in</span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></button>",
+      "css": ".ds-btn-bar { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 52px; padding: 0 1.25rem; background: var(--color-action, #1F3BFF); color: #fff; border: 1px solid var(--color-action, #1F3BFF); border-radius: 0; font-family: 'Archivo', sans-serif; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 0.13s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.13s cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-bar:hover { background: #1530DB; border-color: #1530DB; } .ds-btn-bar:active { background: #0E22B0; } .ds-btn-bar:focus-visible { outline: 2px solid #1F3BFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Transparent with a 1px ink border; inverts to ink on hover.",
+      "html": "<button class=\"ds-btn-secondary\">View grade slip</button>",
+      "css": ".ds-btn-secondary { padding: 0.5rem 1rem; background: transparent; color: #111111; border: 1px solid #111111; border-radius: 0; font-family: 'Archivo', sans-serif; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background-color 0.13s cubic-bezier(0.22, 1, 0.36, 1), color 0.13s cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-secondary:hover { background: #111111; color: #fff; } .ds-btn-secondary:focus-visible { outline: 2px solid #1F3BFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Confirm Button",
+      "kind": "button",
+      "refersTo": "button-confirm",
+      "description": "Ink fill for confirming actions such as submitting an attempt.",
+      "html": "<button class=\"ds-btn-confirm\">Submit exam</button>",
+      "css": ".ds-btn-confirm { padding: 0.5rem 1rem; background: #111111; color: #fff; border: 1px solid #111111; border-radius: 0; font-family: 'Archivo', sans-serif; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background-color 0.13s cubic-bezier(0.22, 1, 0.36, 1); } .ds-btn-confirm:hover { background: #000; border-color: #000; } .ds-btn-confirm:focus-visible { outline: 2px solid #1F3BFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Ruled Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Square white field with a 1px rule; focus thickens the edge to cobalt.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field__label\">Email or roll number</span><input class=\"ds-field__input\" placeholder=\"you@adamasuniversity.ac.in\"></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 0.5rem; font-family: 'Archivo', sans-serif; } .ds-field__label { font-size: 0.8125rem; font-weight: 600; color: #111111; } .ds-field__input { padding: 0.75rem; background: #fff; color: #111111; border: 1px solid #CACAC4; border-radius: 0; font: inherit; font-size: 0.9375rem; } .ds-field__input::placeholder { color: #64645F; } .ds-field__input:hover:not(:focus) { border-color: #64645F; } .ds-field__input:focus { outline: none; border-color: #1F3BFF; box-shadow: inset 0 0 0 1px #1F3BFF; }"
+    },
+    {
+      "name": "Top Bar",
+      "kind": "nav",
+      "description": "Paper bar with a 1px ink bottom rule; active item underlined in cobalt.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav__brand\"><span class=\"ds-nav__mark\"></span>Adamas University</span><a class=\"ds-nav__item is-active\" href=\"#\">Dashboard</a><a class=\"ds-nav__item\" href=\"#\">Results</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 1.5rem; padding: 0.75rem 1.5rem; background: #F6F6F4; border-bottom: 1px solid #111111; font-family: 'Archivo', sans-serif; font-size: 0.875rem; } .ds-nav__brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; letter-spacing: -0.01em; margin-right: auto; color: #111111; } .ds-nav__mark { width: 28px; height: 28px; background: #1F3BFF; } .ds-nav__item { padding: 0.5rem 0.25rem; color: #3B3B38; text-decoration: none; transition: color 0.13s cubic-bezier(0.22, 1, 0.36, 1); } .ds-nav__item:hover { color: #111111; } .ds-nav__item.is-active { color: #111111; box-shadow: inset 0 -2px 0 #1F3BFF; } .ds-nav__item:focus-visible { outline: 2px solid #1F3BFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Window Bar",
+      "kind": "custom",
+      "description": "An exam's access window drawn to scale; the filled part is elapsed time.",
+      "html": "<div class=\"ds-window\"><div class=\"ds-window__caption\">Closes in 2h 10m</div><div class=\"ds-window__track\"><div class=\"ds-window__fill\" style=\"transform: scaleX(0.42)\"></div></div><div class=\"ds-window__ends\"><span>16 Nov, 10:00</span><span>16 Nov, 16:00</span></div></div>",
+      "css": ".ds-window { font-family: 'Archivo', sans-serif; font-size: 0.75rem; color: #64645F; font-variant-numeric: tabular-nums; } .ds-window__caption { font-size: 1rem; font-weight: 700; color: #1F3BFF; margin-bottom: 0.5rem; } .ds-window__track { position: relative; height: 10px; border: 1px solid #1F3BFF; } .ds-window__fill { position: absolute; inset: 0; background: #1F3BFF; transform-origin: left center; transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1); } .ds-window__ends { display: flex; justify-content: space-between; margin-top: 0.5rem; }"
+    },
+    {
+      "name": "Day Ruler",
+      "kind": "custom",
+      "description": "Today to scale on the cobalt field: clock numeral, 24-hour outlined track, faint elapsed fill, strong now mark.",
+      "html": "<figure class=\"ds-day\"><p class=\"ds-day__clock\">14:05</p><div class=\"ds-day__track\"><div class=\"ds-day__fill\" style=\"transform: scaleX(0.587)\"></div><div class=\"ds-day__now\" style=\"left: 58.7%\"></div></div><div class=\"ds-day__hours\"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></figure>",
+      "css": ".ds-day { margin: 0; padding: 1.5rem; background: #1F3BFF; color: #fff; font-family: 'Archivo', sans-serif; font-variant-numeric: tabular-nums; } .ds-day__clock { margin: 0 0 1.5rem; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 800; font-variation-settings: 'wdth' 72; letter-spacing: -0.03em; line-height: 1; } .ds-day__track { position: relative; height: 18px; border: 1px solid rgba(255, 255, 255, 0.78); } .ds-day__fill { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.24); transform-origin: left center; } .ds-day__now { position: absolute; top: -8px; bottom: -8px; width: 3px; background: #fff; transform: translateX(-1.5px); } .ds-day__hours { display: flex; justify-content: space-between; margin-top: 0.75rem; font-size: 0.6875rem; color: rgba(255, 255, 255, 0.78); }"
+    },
+    {
+      "name": "Timetable Row",
+      "kind": "card",
+      "refersTo": "timetable-row-open-focus",
+      "description": "Exams as ruled rows; an open row in hover or focus lifts into the cobalt field.",
+      "html": "<div class=\"ds-row\" tabindex=\"0\"><div><div class=\"ds-row__title\">Data Structures, Mid-term</div><div class=\"ds-row__facts\"><b>60 min</b> 40 marks</div></div><button class=\"ds-row__btn\">Start</button></div>",
+      "css": ".ds-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.5rem 1rem; border-bottom: 1px solid #CACAC4; font-family: 'Archivo', sans-serif; color: #111111; transition: background-color 0.24s cubic-bezier(0.22, 1, 0.36, 1), color 0.24s cubic-bezier(0.22, 1, 0.36, 1); } .ds-row__title { font-size: 1.625rem; font-weight: 800; font-variation-settings: 'wdth' 85; letter-spacing: -0.025em; line-height: 1.05; } .ds-row__facts { margin-top: 0.75rem; font-size: 0.8125rem; color: #64645F; display: flex; gap: 1.25rem; } .ds-row__btn { min-height: 48px; padding: 0 1.5rem; background: #1F3BFF; color: #fff; border: 1px solid #1F3BFF; border-radius: 0; font: inherit; font-weight: 600; } .ds-row:hover, .ds-row:focus-within { background: #1F3BFF; color: #fff; } .ds-row:hover .ds-row__facts, .ds-row:focus-within .ds-row__facts { color: rgba(255, 255, 255, 0.78); } .ds-row:hover .ds-row__btn, .ds-row:focus-within .ds-row__btn { background: #fff; color: #1F3BFF; border-color: #fff; } .ds-row:focus-visible { outline: 2px solid #1F3BFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Crosslink",
+      "kind": "custom",
+      "description": "Full-width row between ink rules linking to the other portal.",
+      "html": "<button class=\"ds-cross\"><span>Examination staff</span><span class=\"ds-cross__action\">Admin portal <svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></span></button>",
+      "css": ".ds-cross { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 1rem 0; background: none; border: 0; border-top: 1px solid #111111; border-bottom: 1px solid #111111; color: #64645F; font-family: 'Archivo', sans-serif; font-size: 0.8125rem; cursor: pointer; } .ds-cross__action { display: inline-flex; align-items: center; gap: 0.5rem; color: #111111; font-weight: 700; } .ds-cross__action svg { transition: transform 0.24s cubic-bezier(0.19, 1, 0.22, 1); } .ds-cross:hover .ds-cross__action { color: #1F3BFF; } .ds-cross:hover .ds-cross__action svg { transform: translateX(4px); } .ds-cross:focus-visible { outline: 2px solid #1F3BFF; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Institutional Poster",
+    "overview": "The portal is set like a university's official typographic notice in the Swiss International Typographic Style: a visible twelve-column grid, hierarchy carried by scale alone, and one committed colour that owns whole regions. Cool paper and ink do almost all the work; cobalt arrives as a solid field (the sign-in field, the dashboard masthead, an open exam row in focus, a passing grade slip), never as a scattering of accents. Trust comes from precision, not decoration.\n\nTime is the signature graphic, drawn to scale. A bar's length is a fact: the day ruler on the sign-in field is a real 24-hour rule with the elapsed day as a faint fill and \"now\" as the strongest mark; the window bar on the dashboard is an exam's real access window with the elapsed part filled. These are measurements, never progress-bar decoration.\n\nDensity is calm and generous: ruled rows instead of card grids, large statements set against narrow detail columns, and 1px rules doing the separating that shadows and tints would do elsewhere. The system refuses the dark glassmorphic dashboard it replaced: no glows, gradient blobs, frosted panels or tilted cards.",
+    "keyCharacteristics": [
+      "Paper (#F6F6F4) and ink (#111111) with cobalt (#1F3BFF) owning whole fields.",
+      "A twelve-column grid drawn as faint hairlines, visible behind the page and inside the cobalt field.",
+      "One family, Archivo, whose width axis runs from condensed monumental numerals (wdth 68) to normal text (wdth 100); tabular figures everywhere.",
+      "Square corners, 1px rules, flat surfaces; only overlays lift.",
+      "Durations and windows drawn to their real length.",
+      "One motion grammar (clip-path settle on scroll), visible by default, absent on the exam screen."
+    ],
+    "rules": [
+      { "name": "The Owned Field Rule", "body": "Cobalt is applied as a whole region or a whole bar, never as a sprinkle of coloured icons, borders or badges across a paper surface. If a screen has cobalt in more than two small places, consolidate it into one field.", "section": "colors" },
+      { "name": "The Ink Inversion Rule", "body": "The staff side carries the same composition with the field set in ink instead of cobalt; the action bar stays cobalt.", "section": "colors" },
+      { "name": "The Width-Axis Rule", "body": "Hierarchy is made by size and the wdth axis, not by adding a family. Bigger means more condensed: display 68-72, headlines 80-88, body 100.", "section": "typography" },
+      { "name": "The Sentence-Case Rule", "body": "Labels, table headers, badges and alerts are sentence case with zero or near-zero tracking. The poster layer explicitly reset the legacy uppercase tracked labels.", "section": "typography" },
+      { "name": "The Tabular Rule", "body": "Figures are tabular everywhere (set on body), so times, marks and counts align without a mono costume.", "section": "typography" },
+      { "name": "The Shared Edge Rule", "body": "Content below the fold aligns to the field's left edge (same clamp padding), not to a re-centred container.", "section": "layout" },
+      { "name": "The Flat Paper Rule", "body": "Cards, buttons, inputs, rows, alerts and the exam timer carry no shadow and no lift on hover. Hover is shown by a stronger rule or a fill change, never by elevation or transform.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do give cobalt (#1F3BFF) a whole region: a field, a masthead, a full-width action bar, a focused row.",
+      "Do draw time to scale: a bar's length must be the real duration or window, and \"now\" is the strongest mark.",
+      "Do keep the twelve-column hairline grid visible and align blocks to it; drop to four columns under 760px.",
+      "Do set hierarchy with Archivo's size and width axis (wdth 68 to 100) and keep figures tabular.",
+      "Do separate with 1px rules; open dashboard sections with a 2px ink top rule.",
+      "Do keep content visible by default and gate motion behind script, reduced motion and tab visibility.",
+      "Do keep the exam screen still: same palette and type, no reveal, pulse or fade."
+    ],
+    "donts": [
+      "Don't round corners on anything that is not intrinsically circular.",
+      "Don't put shadows, glows, lifts or transforms on cards, buttons, inputs or rows; only overlays and dialogs lift.",
+      "Don't sprinkle cobalt as accent icons, coloured borders or tinted badges across paper.",
+      "Don't bring back the dark glassmorphic dashboard: no frosted panels, gradient blobs, glare or tilt cards.",
+      "Don't add a second typeface or a monospace; Archivo with tabular figures covers numerals.",
+      "Don't set labels, headers or badges in uppercase with wide tracking.",
+      "Don't fill a surface with a status colour except a danger button; status marks icon, label or a thin border.",
+      "Don't use ink-faint (#8A8A84) for reading text on paper."
+    ]
+  }
+}
