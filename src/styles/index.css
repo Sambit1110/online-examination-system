@@ -5131,3 +5131,44 @@ a {
   .poster-principles,
   .poster-footer { padding-left: var(--space-4); padding-right: var(--space-4); }
 }
+
+/* ==========================================================================
+   ADMIN CONSOLE RAIL — re-set in poster terms. The colour conversion left
+   the old dark glass as a grey wash; the rail is now flat paper with an
+   ink rule, and the active destination is a cobalt bar, not a glow.
+   ========================================================================== */
+.rail,
+.rail-topbar {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-strong);
+  box-shadow: none;
+}
+.rail-topbar { border-right: 0; border-bottom: 1px solid var(--border-strong); }
+
+.rail__mark,
+.rail__avatar {
+  background: var(--color-action);
+  color: var(--on-action);
+  box-shadow: none;
+  border-radius: 0;
+}
+.rail__avatar { border-radius: var(--radius-full); background: var(--text-main); }
+.rail__brand-name { font-weight: 800; letter-spacing: -0.01em; }
+
+.rail__section-label {
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+.rail__item { border-radius: 0; color: var(--text-secondary); }
+.rail__item:hover { background: var(--bg-surface-secondary); color: var(--text-main); }
+.rail__item[data-active='true'] {
+  background: var(--color-action);
+  color: var(--on-action);
+}
+.rail__item[data-active='true'] .rail__item-icon { color: var(--on-action); }
+.rail__item[data-active='true']::before { display: none; }
+
+.rail__footer { border-top: 1px solid var(--border-strong); }
