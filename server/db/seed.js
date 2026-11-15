@@ -24,7 +24,7 @@ export function seedDatabase() {
   const users = [
     {
       id: 'USR-ADMIN-01',
-      name: 'Prof. Anirban Mukherjee',
+      name: 'Prof. Sambit Biswas',
       email: 'admin@adamas.ac.in',
       passwordHash: adminPasswordHash,
       role: 'admin',

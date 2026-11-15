@@ -35,7 +35,7 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 const DEMO_ADMIN = {
   email: 'admin@adamas.ac.in',
   password: 'Admin@12345',
-  name: 'Prof. Anirban Mukherjee',
+  name: 'Prof. Sambit Biswas',
   role: 'admin'
 };
 
