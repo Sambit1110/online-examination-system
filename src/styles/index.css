@@ -220,8 +220,8 @@ h1, h2, h3, h4, h5, h6 {
   text-wrap: balance;
 }
 
-/* Display type. Instrument Serif has a single weight by design — it is
-   meant to be set large and given room, not bolded. */
+/* Display type: Archivo condensed on its width axis. The poster layer at
+   the end of this file sets its final weight and width. */
 .serif-title {
   font-family: var(--font-display);
   font-weight: 400;
@@ -5172,3 +5172,13 @@ a {
 .rail__item[data-active='true']::before { display: none; }
 
 .rail__footer { border-top: 1px solid var(--border-strong); }
+
+/* Leftover labels from the old theme: sentence case, no tracking */
+.exam-header__eyebrow,
+.page-banner__eyebrow,
+.backup-card__eyebrow {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  color: var(--text-muted);
+}

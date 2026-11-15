@@ -16,7 +16,7 @@ export const Badge: React.FC<BadgeProps> = ({ type, children }) => {
         color: 'var(--color-success)',
         border: '1px solid var(--color-success-border)'
       };
-      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--color-success)', color: 'var(--color-success)', display: 'inline-block', animation: 'badgeDotRing 1.8s ease-in-out infinite' }} />;
+      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--color-success)', color: 'var(--color-success)', display: 'inline-block' }} />;
       break;
     case 'scheduled':
       style = {
@@ -68,7 +68,7 @@ export const Badge: React.FC<BadgeProps> = ({ type, children }) => {
         color: 'var(--color-accent-cyan)',
         border: '1px solid var(--color-accent-cyan-border)'
       };
-      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--color-accent-cyan)', color: 'var(--color-accent-cyan)', display: 'inline-block', animation: 'badgeDotRing 1.8s ease-in-out infinite' }} />;
+      dot = <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--color-accent-cyan)', color: 'var(--color-accent-cyan)', display: 'inline-block' }} />;
       break;
   }
 

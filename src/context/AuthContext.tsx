@@ -329,11 +329,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       setPortalCheckPending(false);
       // A thrown error here is a transport failure — DNS, CORS, offline, or
-      // a URL pointing at a project that no longer exists.
+      // a URL pointing at a project that no longer exists. The raw browser
+      // message ("TypeError: Failed to fetch") means nothing to a student,
+      // so it goes to the console and the screen gets plain words.
+      console.error('Sign-in request failed:', describeError(err, 'network error'));
       return {
         success: false,
         kind: 'network',
-        error: `Could not reach the authentication service. Check your connection and that the portal is configured correctly (${describeError(err, 'network error')}).`
+        error:
+          "The exam server can't be reached right now, so you can't sign in yet. Check your internet connection and try again in a minute."
       };
     }
   };
